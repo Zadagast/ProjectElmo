@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Project Elmo 001.9 — Pawn Drop Shadow (Fixed) — Undo/Redo No-Op</title>
+  <style>
+    :root { --bg1:#1f7a1f; --bg2:#2fb02f; --bg3:#9fe29f; }
+    html,body{height:100%;margin:0}
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      display:flex;flex-direction:column;align-items:center;
+      background: linear-gradient(120deg,var(--bg1) 0%,var(--bg2)45%,var(--bg3)100%);
+      min-height:100vh;padding:20px;box-sizing:border-box;overflow-x:hidden;
+      position:relative;
+    }
+    h1{margin:8px 0;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,0.25)}
+    .flower-field { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+    .flower { position: absolute; font-size: 20px; opacity: 0.18; transform-origin: center; will-change: transform, opacity; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.08)); animation: floatUp var(--dur) linear infinite; }
+    @keyframes floatUp { 0% { transform: translateY(0) rotate(0deg) scale(var(--scale)); opacity: var(--startOpacity); } 50% { transform: translateY(-8px) rotate(var(--rot)) scale(calc(var(--scale) * 1.03)); opacity: calc(var(--startOpacity) + 0.06); } 100% { transform: translateY(0) rotate(calc(var(--rot) * -1)) scale(var(--scale)); opacity: var(--startOpacity); } }
+
+    /* board backdrop container */
+    #boardBackdrop {
+      position: relative;
+      z-index: 2;
+      margin-top: 18px;
+      background: rgba(30,30,30,0.30);
+      padding: 18px 44px;
+      border-radius: 14px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.02);
+      backdrop-filter: blur(4px);
+      display: inline-block;
+    }
+
+    #boardWrap { position: relative; }
+    #board{display:grid;grid-template-columns:repeat(5,60px);grid-template-rows:repeat(5,60px);gap:6px;user-select:none; transition: transform 160ms ease-out; will-change: transform;}
+    .cell{width:60px;height:60px;font-size:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer;transition:transform .08s,box-shadow .12s,background-color .2s;box-shadow:0 2px 0 rgba(0,0,0,0.12)}
+    .white{background:#fff;color:#111}.black{background:#333;color:#fff}
+    .captured-red{background:#ff6b6b !important}.captured-blue{background:#6bb2ff !important}
+
+    /* Pawn visuals with enhanced drop shadow and subtle elevation; pointer-events enabled so they are interactive */
+    .pawn{
+      transform-origin:center;
+      animation:idleBounce 1.8s ease-in-out infinite;
+      z-index: 2;
+      pointer-events: auto;
+      filter: drop-shadow(0 6px 10px rgba(0,0,0,0.28)) drop-shadow(0 2px 4px rgba(0,0,0,0.14));
+      transition: transform 120ms cubic-bezier(.2,.9,.3,1), filter 120ms ease;
+      will-change: transform, filter;
+      display:inline-block;
+      line-height:1;
+      text-shadow: 0 2px 0 rgba(0,0,0,0.08);
+    }
+    .pawn.dragging{
+      opacity:.9;
+      transform: translateY(-6px) scale(1.06);
+      filter: drop-shadow(0 12px 20px rgba(0,0,0,0.36)) drop-shadow(0 4px 8px rgba(0,0,0,0.22));
+    }
+    .pawn:active{ transform: translateY(-2px) scale(1.08); filter: drop-shadow(0 10px 16px rgba(0,0,0,0.34)) drop-shadow(0 3px 6px rgba(0,0,0,0.18)); }
+    @keyframes idleBounce{0%,100%{transform:translateY(0) scale(1);}25%{transform:translateY(-3px) scale(1.03);}50%{transform:translateY(0) scale(.99);}75%{transform:translateY(-2px) scale(1.02);}}
+    .captured{animation:fadeOut .28s forwards}@keyframes fadeOut{to{opacity:0;transform:scale(.6)}}
+
+    #controls{margin-top:12px;display:flex;gap:8px;align-items:center;z-index:3;position:relative}
+    button{padding:8px 12px;border-radius:6px;border:none;cursor:pointer}
+    button:disabled{opacity:.45;cursor:not-allowed}
+    #status{margin-top:12px;color:white;font-size:16px;min-height:22px;text-shadow:0 1px 0 rgba(0,0,0,0.2);z-index:3;position:relative}
+
+    .explosion { position: absolute; pointer-events: none; transform: translate(-50%, -50%); width: 220px; height: 220px; will-change: opacity, transform; z-index: 4; }
+    .explosion .ring { position: absolute; left:50%; top:50%; width:40px; height:40px; border-radius:50%; transform:translate(-50%,-50%) scale(0.3); border:6px solid rgba(255,240,170,0.98); animation: ringPop 520ms cubic-bezier(.1,.9,.2,1) forwards; filter: blur(0.6px) drop-shadow(0 6px 12px rgba(0,0,0,0.25)); }
+    @keyframes ringPop { to { transform: translate(-50%,-50%) scale(5.0); opacity: 0; } }
+    .explosion .flash { position:absolute; left:50%; top:50%; width:80px; height:80px; transform:translate(-50%,-50%) scale(0.6); background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.98), rgba(255,230,120,0.85) 50%, transparent 70%); border-radius:50%; opacity:0.98; animation: flashPop 260ms cubic-bezier(.2,.9,.3,1) forwards; mix-blend-mode:screen; filter:drop-shadow(0 10px 20px rgba(0,0,0,0.35)); }
+    @keyframes flashPop { to { transform: translate(-50%,-50%) scale(2.2); opacity:0; } }
+    .explosion .shock { position:absolute; left:50%; top:50%; width:120px; height:120px; transform:translate(-50%,-50%) scale(0.2); border-radius:50%; background: radial-gradient(circle, rgba(255,240,160,0.12), rgba(255,160,60,0.05) 45%, transparent 60%); opacity:0.9; animation: shockPop 520ms cubic-bezier(.1,.9,.2,1) forwards; mix-blend-mode:screen; filter: blur(6px); }
+    @keyframes shockPop { to { transform: translate(-50%,-50%) scale(2.8); opacity: 0; } }
+    .explosion .particle { position:absolute; left:50%; top:50%; width:12px; height:12px; border-radius:50%; opacity:1; transform-origin:center; animation: particleFly 720ms cubic-bezier(.12,.85,.28,1) forwards; box-shadow:0 2px 6px rgba(0,0,0,0.28); background: radial-gradient(circle at 30% 30%, #fff, transparent 50%), #ffda77; }
+    @keyframes particleFly { to { transform: translate(var(--tx), var(--ty)) scale(0.35); opacity: 0; filter: blur(0.6px); } }
+  </style>
+</head>
+<body>
+  <div class="flower-field" id="flowerField" aria-hidden="true"></div>
+
+  <h1>Project Elmo 001.9</h1>
+
+  <div id="controls">
+    <button id="resetBtn">Reset</button>
+    <button id="undoBtn" disabled>Undo</button>
+    <button id="redoBtn" disabled>Redo</button>
+  </div>
+
+  <div id="status"></div>
+
+  <div id="boardBackdrop">
+    <div id="boardWrap">
+      <div id="board" aria-label="game board"></div>
+    </div>
+  </div>
+
+  <script>
+    // Flower sprinkle
+    (function initFlowers() {
+      const field = document.getElementById('flowerField');
+      const viewportW = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+      const viewportH = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+      const base = Math.min(38, Math.round((viewportW * viewportH) / (1400 * 800) * 30) + 8);
+      const baseCount = Math.max(12, base) * 2;
+      const flowerEmojis = ['🌸','🌼','🌺','🌻','🌷'];
+      for (let i = 0; i < baseCount; i++) {
+        const span = document.createElement('span');
+        span.className = 'flower';
+        span.textContent = flowerEmojis[Math.floor(Math.random() * flowerEmojis.length)];
+        const left = Math.random() * 110;
+        const top = Math.random() * 110;
+        span.style.left = left + '%';
+        span.style.top = top + '%';
+        const dur = (6 + Math.random() * 8).toFixed(2) + 's';
+        const scale = (0.7 + Math.random() * 0.9).toFixed(2);
+        const rot = (Math.random() * 60 - 30).toFixed(1) + 'deg';
+        const startOpacity = (0.08 + Math.random() * 0.18).toFixed(2);
+        span.style.setProperty('--dur', dur);
+        span.style.setProperty('--scale', scale);
+        span.style.setProperty('--rot', rot);
+        span.style.setProperty('--startOpacity', startOpacity);
+        const fontSize = Math.round(12 + Math.random() * 22);
+        span.style.fontSize = fontSize + 'px';
+        field.appendChild(span);
+      }
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          field.innerHTML = '';
+          initFlowers();
+        }, 300);
+      });
+    })();
+
+    // Game core with snapshot undo/redo
+    const board = document.getElementById('board');
+    const boardWrap = document.getElementById('boardWrap');
+    const status = document.getElementById('status');
+    const resetBtn = document.getElementById('resetBtn');
+    const undoBtn = document.getElementById('undoBtn');
+    const redoBtn = document.getElementById('redoBtn');
+
+    let currentPlayer = 'red';
+    let dragged = null;
+    let chainMode = false;
+    let chainPawn = null;
+    let chainCount = 0;
+    let scores = { red: 0, blue: 0 };
+
+    const undoStack = [];
+    const redoStack = [];
+
+    // suppress snapshots while performing undo/redo so they do not "count" as moves
+    let suppressSnapshots = false;
+
+    let audioCtx = null;
+    function ensureAudioContext(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+
+    function playEscalatingCapture(level=1) {
+      try {
+        ensureAudioContext();
+        if(audioCtx.state==='suspended') audioCtx.resume().catch(()=>{});
+        const now = audioCtx.currentTime;
+        const master = audioCtx.createGain(); master.gain.value = 0.9; master.connect(audioCtx.destination);
+        (function(){
+          const baseFreqs = [220, 330, 440];
+          baseFreqs.forEach((base, i) => {
+            const t = now + 0.06 + i*0.075;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const hp = audioCtx.createBiquadFilter();
+            const freq = base * (1 + (level-1)*0.08) * (1 + (i*0.04));
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+            hp.type = 'highpass';
+            hp.frequency.value = 220 + level*30;
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.linearRampToValueAtTime(0.14 * Math.min(1, level*0.95), t + 0.008);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+            osc.connect(hp); hp.connect(gain); gain.connect(master);
+            osc.start(t); osc.stop(t + 0.32);
+          });
+        })();
+        (function(){
+          const t = now + 0.22;
+          const oscA = audioCtx.createOscillator();
+          const oscB = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const freqStart = 880 * (1 + (level-1)*0.08);
+          oscA.type = 'sine'; oscB.type = 'triangle';
+          oscA.frequency.setValueAtTime(freqStart*0.95, t); oscB.frequency.setValueAtTime(freqStart*1.02, t);
+          gain.gain.setValueAtTime(0.0001, t);
+          gain.gain.linearRampToValueAtTime(0.12 * Math.min(1.2, level*0.7), t + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.36);
+          oscA.connect(gain); oscB.connect(gain); gain.connect(master);
+          oscA.start(t); oscB.start(t); oscA.stop(t + 0.36); oscB.stop(t + 0.36);
+        })();
+      } catch(e){ console.warn('Audio error', e); }
+    }
+
+    function showExplosionAtCell(cellElem, color = 'orange') {
+      if (!cellElem) return;
+      const cellRect = cellElem.getBoundingClientRect();
+      const wrapRect = boardWrap.getBoundingClientRect();
+      const cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
+      const cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
+      const expl = document.createElement('div');
+      expl.className = 'explosion';
+      expl.style.left = cx + 'px';
+      expl.style.top = cy + 'px';
+      const ring = document.createElement('div'); ring.className = 'ring'; ring.style.borderColor = color === 'red' ? 'rgba(255,140,140,0.98)' : 'rgba(140,200,255,0.98)'; expl.appendChild(ring);
+      const flash = document.createElement('div'); flash.className = 'flash'; expl.appendChild(flash);
+      const shock = document.createElement('div'); shock.className = 'shock'; expl.appendChild(shock);
+      const total = 20;
+      for (let i = 0; i < total; i++) {
+        const p = document.createElement('div'); p.className = 'particle';
+        if (Math.random() > 0.8) p.classList.add('big');
+        if (i % 3 === 0) p.classList.add('blue');
+        if (i % 5 === 0) p.classList.add('red');
+        const angle = (i / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.8;
+        const dist = 50 + Math.random() * 90;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist;
+        p.style.setProperty('--tx', tx + 'px'); p.style.setProperty('--ty', ty + 'px');
+        p.style.width = (8 + Math.random() * 12) + 'px'; p.style.height = p.style.width;
+        p.style.animationDelay = (Math.random() * 120) + 'ms';
+        expl.appendChild(p);
+      }
+      boardWrap.appendChild(expl);
+      setTimeout(() => { expl.remove(); }, 900);
+    }
+
+    function makePawn(color) {
+      const pawn = document.createElement('div');
+      pawn.className = 'pawn';
+      pawn.textContent = color === 'red' ? '😈' : '😇';
+      pawn.draggable = true;
+      pawn.dataset.color = color;
+
+      // Desktop dragstart/dragend
+      pawn.addEventListener('dragstart', (ev) => {
+        if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); return; }
+        if (chainMode && pawn !== chainPawn) { ev.preventDefault(); return; }
+        dragged = pawn;
+        pawn.classList.add('dragging');
+        try { ev.dataTransfer.setData('text/plain','drag'); } catch(e){}
+        ensureAudioContext();
+      });
+      pawn.addEventListener('dragend', () => pawn.classList.remove('dragging'));
+
+      // Pointer-based fallback for touch/pen devices
+      pawn.addEventListener('pointerdown', (ev) => {
+        if (pawn.dataset.color !== currentPlayer) return;
+        if (chainMode && pawn !== chainPawn) return;
+        try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
+        dragged = pawn;
+        pawn.classList.add('dragging');
+      });
+      pawn.addEventListener('pointerup', (ev) => {
+        try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
+        setTimeout(() => pawn.classList.remove('dragging'), 40);
+      });
+
+      return pawn;
+    }
+
+    // Snapshot helpers
+    function takeSnapshot() {
+      const boardArr = new Array(25).fill(null);
+      for (let i = 0; i < 25; i++) {
+        const cell = board.children[i];
+        if (!cell) continue;
+        const pawnEl = cell.querySelector('.pawn');
+        if (pawnEl) {
+          boardArr[i] = { pawn: pawnEl.dataset.color, captured: cell.classList.contains('captured-red') || cell.classList.contains('captured-blue') };
+        } else if (cell.classList.contains('captured-red')) {
+          boardArr[i] = { pawn: 'red', captured: true };
+        } else if (cell.classList.contains('captured-blue')) {
+          boardArr[i] = { pawn: 'blue', captured: true };
+        } else {
+          boardArr[i] = null;
+        }
+      }
+      return {
+        board: boardArr,
+        currentPlayer,
+        scores: { red: scores.red, blue: scores.blue },
+        chainMode: !!chainMode,
+        chainCount: chainCount || 0,
+        chainPawnIdx: (chainPawn && chainPawn.parentElement) ? Number(chainPawn.parentElement.dataset.index) : null
+      };
+    }
+
+    function applySnapshot(snapshot) {
+      if (!snapshot || !Array.isArray(snapshot.board)) return;
+      for (let i = 0; i < 25; i++) {
+        const cell = board.children[i];
+        if (!cell) continue;
+        cell.innerHTML = '';
+        cell.classList.remove('captured-red','captured-blue','black','white');
+        cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
+      }
+      for (let i = 0; i < 25; i++) {
+        const entry = snapshot.board[i];
+        const cell = board.children[i];
+        if (!cell) continue;
+        if (entry && entry.pawn) {
+          if (entry.captured) {
+            cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
+          }
+          const pawn = makePawn(entry.pawn);
+          cell.appendChild(pawn);
+        }
+      }
+      currentPlayer = snapshot.currentPlayer;
+      scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
+      chainMode = !!snapshot.chainMode;
+      chainCount = snapshot.chainCount || 0;
+      chainPawn = null;
+      if (typeof snapshot.chainPawnIdx === 'number' && snapshot.chainPawnIdx >= 0 && snapshot.chainPawnIdx < 25) {
+        const cpCell = board.children[snapshot.chainPawnIdx];
+        if (cpCell) chainPawn = cpCell.querySelector('.pawn');
+      }
+      updateStatus();
+      updateUndoRedoButtons();
+    }
+
+    function recordSnapshot() {
+      if (suppressSnapshots) return;
+      undoStack.push(takeSnapshot());
+      redoStack.length = 0;
+      updateUndoRedoButtons();
+    }
+
+    function updateUndoRedoButtons(){
+      undoBtn.disabled = undoStack.length <= 1;
+      redoBtn.disabled = redoStack.length === 0;
+    }
+
+    function undo(){
+      if (undoStack.length <= 1) return;
+      const current = undoStack.pop();
+      redoStack.push(current);
+
+      // suppress snapshot recording while applying previous snapshot
+      suppressSnapshots = true;
+      try {
+        const prev = undoStack[undoStack.length - 1];
+        if (prev) applySnapshot(prev);
+      } finally {
+        suppressSnapshots = false;
+      }
+
+      updateStatus(`Undid action`);
+    }
+
+    function redo(){
+      if (redoStack.length === 0) return;
+      const snap = redoStack.pop();
+
+      suppressSnapshots = true;
+      try {
+        applySnapshot(snap);
+        undoStack.push(snap);
+      } finally {
+        suppressSnapshots = false;
+      }
+
+      updateStatus(`Redid action`);
+    }
+
+    // Board init / controls
+    resetBtn.addEventListener('click', () => { resetBoard(); });
+
+    function updateStatus(message='') {
+      if (message) { status.textContent = message; return; }
+      status.textContent = `Turn: ${currentPlayer==='red'?'😈 (red)':'😇 (blue)'} | Score 😈: ${scores.red} ⬄ 😇: ${scores.blue}` + (chainMode ? ' — chain active' : '');
+    }
+
+    function resetBoard(){
+      board.innerHTML = '';
+      scores = { red: 0, blue: 0 };
+      currentPlayer = 'red';
+      dragged = null; chainMode = false; chainPawn = null; chainCount = 0;
+      for(let i=0;i<25;i++){
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
+        cell.dataset.index = i;
+        cell.addEventListener('click', () => onCellClick(cell));
+        cell.addEventListener('dragover', e => e.preventDefault());
+        cell.addEventListener('drop', e => handleDrop(e, cell));
+        board.appendChild(cell);
+      }
+      undoStack.length = 0;
+      redoStack.length = 0;
+      // seed initial snapshot without suppression (it's a baseline)
+      undoStack.push(takeSnapshot());
+      updateStatus();
+      updateUndoRedoButtons();
+    }
+
+    // Gameplay helpers
+    function onCellClick(cell){
+      const idx = Number(cell.dataset.index);
+      const row = Math.floor(idx / 5);
+      if ((currentPlayer==='red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
+      if (cell.querySelector('.pawn')) return;
+      const pawn = makePawn(currentPlayer);
+      cell.appendChild(pawn);
+      recordSnapshot();
+      switchTurn();
+    }
+
+    function isValidMove(dx, dy){ return dx <= 1 && dy <= 1 && (dx + dy > 0); }
+    function isValidCapture(dx, dy){ return dx === 1 && dy === 1; }
+
+    function availableDiagonalCapturesFromCell(cellElem) {
+      if (!cellElem) return [];
+      const idx = Number(cellElem.dataset.index);
+      const x = idx % 5; const y = Math.floor(idx / 5);
+      const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+      const available = [];
+      const pawn = cellElem.querySelector('.pawn');
+      if (!pawn) return [];
+      for(const [dx,dy] of dirs){
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || nx >= 5 || ny < 0 || ny >= 5) continue;
+        const nIdx = ny*5 + nx;
+        const neighbor = board.children[nIdx];
+        const occ = neighbor.querySelector('.pawn');
+        if (occ && occ.dataset.color !== pawn.dataset.color) available.push({idx: nIdx, cell: neighbor});
+      }
+      return available;
+    }
+
+    function handleDrop(e, targetCell){
+      e.preventDefault();
+      if (!dragged) return;
+      const pawn = dragged;
+      const fromCell = pawn.parentElement;
+      if (!fromCell) { dragged = null; return; }
+      const fromIdx = Number(fromCell.dataset.index);
+      const toIdx = Number(targetCell.dataset.index);
+      const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
+      const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
+      if (!isValidMove(dx, dy)) return;
+      const existing = targetCell.querySelector('.pawn');
+
+      if (existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx, dy)) {
+        existing.classList.add('captured');
+        const capturedColor = existing.dataset.color;
+
+        setTimeout(() => {
+          targetCell.innerHTML = '';
+          targetCell.classList.remove('black','white','captured-red','captured-blue');
+          targetCell.classList.add(pawn.dataset.color === 'red' ? 'captured-red' : 'captured-blue');
+          targetCell.appendChild(pawn);
+          pawn.classList.remove('dragging');
+
+          scores[currentPlayer]++;
+          chainCount++;
+
+          showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
+          playEscalatingCapture(Math.min(6, Math.max(1, chainCount)));
+
+          const further = availableDiagonalCapturesFromCell(targetCell);
+          if (further.length > 0) {
+            chainMode = true;
+            chainPawn = pawn;
+            dragged = pawn;
+            recordSnapshot();
+            updateStatus(`Chain x${chainCount} — continue capturing with same pawn`);
+          } else {
+            chainMode = false;
+            chainPawn = null;
+            chainCount = 0;
+            dragged = null;
+            recordSnapshot();
+            if (checkWin(currentPlayer)) return;
+            switchTurn();
+          }
+        }, 220);
+        return;
+      }
+
+      if (existing) return;
+      targetCell.appendChild(pawn);
+      pawn.classList.remove('dragging');
+      recordSnapshot();
+      dragged = null;
+      if (!checkWin(currentPlayer)) switchTurn();
+    }
+
+    function switchTurn(){
+      currentPlayer = currentPlayer === 'red' ? 'blue' : 'red';
+      updateStatus();
+      dragged = null;
+      chainMode = false; chainPawn = null; chainCount = 0;
+    }
+
+    // Win detection
+    function ownerOf(index){
+      const cell = board.children[index];
+      if (!cell) return null;
+      if (cell.classList.contains('captured-red')) return 'red';
+      if (cell.classList.contains('captured-blue')) return 'blue';
+      const p = cell.querySelector('.pawn');
+      if (p) return p.dataset.color || null;
+      return null;
+    }
+
+    function endGame(playerColor){
+      updateStatus(`🏆 ${playerColor === 'red' ? '😈' : '😇'} wins Project Elmo!`);
+      board.querySelectorAll('.cell').forEach(cell => {
+        cell.removeEventListener('drop', handleDrop);
+      });
+    }
+
+    function checkWin(playerColor){
+      for (let r = 0; r < 5; r++){
+        for (let c = 0; c <= 2; c++){
+          const a = ownerOf(r * 5 + c);
+          const b = ownerOf(r * 5 + c + 1);
+          const c2 = ownerOf(r * 5 + c + 2);
+          if (a === playerColor && b === playerColor && c2 === playerColor){
+            endGame(playerColor);
+            return true;
+          }
+        }
+      }
+      for (let c = 0; c < 5; c++){
+        for (let r = 0; r <= 2; r++){
+          const a = ownerOf(r * 5 + c);
+          const b = ownerOf((r + 1) * 5 + c);
+          const c2 = ownerOf((r + 2) * 5 + c);
+          if (a === playerColor && b === playerColor && c2 === playerColor){
+            endGame(playerColor);
+            return true;
+          }
+        }
+      }
+      for (let r = 0; r <= 2; r++){
+        for (let c = 0; c <= 2; c++){
+          const a = ownerOf(r * 5 + c);
+          const b = ownerOf((r + 1) * 5 + (c + 1));
+          const c2 = ownerOf((r + 2) * 5 + (c + 2));
+          if (a === playerColor && b === playerColor && c2 === playerColor){
+            endGame(playerColor);
+            return true;
+          }
+        }
+      }
+      for (let r = 2; r < 5; r++){
+        for (let c = 0; c <= 2; c++){
+          const a = ownerOf(r * 5 + c);
+          const b = ownerOf((r - 1) * 5 + (c + 1));
+          const c2 = ownerOf((r - 2) * 5 + (c + 2));
+          if (a === playerColor && b === playerColor && c2 === playerColor){
+            endGame(playerColor);
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // initialize
+    resetBoard();
+    undoBtn.addEventListener('click', () => undo());
+    redoBtn.addEventListener('click', () => redo());
+
+    // debug
+    window.__PE = { undoStack, redoStack, takeSnapshot: () => undoStack[undoStack.length-1], applySnapshot };
+  </script>
+</body>
+</html>
