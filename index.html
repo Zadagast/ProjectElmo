@@ -231,6 +231,30 @@
   @keyframes shockPop { to { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
   .explosion .particle { position:absolute; left:50%; top:50%; width:calc(14px * var(--scale)); height:calc(14px * var(--scale)); border-radius:50%; opacity:1; transform-origin:center; animation: particleFly 760ms cubic-bezier(.12,.85,.28,1) forwards; box-shadow:0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32); background: radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b; }
   @keyframes particleFly { to { transform: translate(var(--tx), var(--ty)) scale(0.36); opacity: 0; filter: blur(0.8px); } }
+  /* Movement trails (larger, brighter, longer-lived) */
+  .trail { position: absolute; pointer-events: none; width: calc(140px * var(--scale)); height: calc(64px * var(--scale)); transform: translate(-50%, -50%); border-radius: calc(20px * var(--scale)); z-index: 16; overflow: visible; }
+
+  /* Fire trail — bigger flames, longer rise */
+  /* particles use a consistent base size so red and blue trails match visually */
+  .trail { --trail-px: calc(18px * var(--scale)); --trail-w: calc(140px * var(--scale)); --trail-h: calc(64px * var(--scale)); }
+  .trail { width: var(--trail-w); height: var(--trail-h); }
+  /* apply base particle styling to both flame and spark elements */
+  .trail .flame, .trail .spark { position: absolute; width: var(--trail-px); height: var(--trail-px); border-radius: 50%; transform: translate(-50%,-50%) scale(1); filter: blur(calc(1.6px * var(--scale))); mix-blend-mode: normal; opacity:0.98; }
+  .trail-fire .flame:nth-child(1){ background: radial-gradient(circle at 40% 30%, rgba(255,240,180,1), rgba(255,140,60,0.98) 36%, rgba(230,80,40,0.94) 62%, rgba(200,40,30,0.85) 78%, transparent 92%); left:36%; top:66%; }
+  .trail-fire .flame:nth-child(2){ background: radial-gradient(circle at 40% 30%, rgba(255,220,160,0.96), rgba(255,120,40,0.94) 36%, rgba(220,60,30,0.86) 58%, transparent 90%); left:64%; top:56%; }
+  .trail-fire .flame:nth-child(3){ background: radial-gradient(circle at 40% 30%, rgba(255,200,140,0.94), rgba(255,110,40,0.92) 36%, rgba(210,60,30,0.84) 58%, transparent 90%); left:50%; top:60%; }
+  .trail-fire .flame{ animation: trailFireRise 1600ms cubic-bezier(.2,.8,.2,1) forwards; }
+  .trail-fire .flame:nth-child(4){ background: radial-gradient(circle at 40% 30%, rgba(255,230,150,0.94), rgba(255,130,50,0.9) 36%, rgba(220,70,40,0.82) 58%, transparent 90%); left:58%; top:68%; animation-delay:160ms; }
+  @keyframes trailFireRise { to { transform: translate(-50%,-220%) scale(0.5); opacity: 0; } }
+
+  /* Sparkle trail — stronger glow, longer life, particles match red size */
+  /* spark-specific coloring and positions handled per nth-child below */
+  .trail-sparkle .spark:nth-child(1){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,1) 0%, rgba(150,220,255,0.98) 30%, rgba(70,170,255,0.94) 56%, rgba(30,120,220,0.86) 78%, rgba(20,90,180,0.6) 92%); left:50%; top:50%; box-shadow: 0 0 calc(12px * var(--scale)) rgba(80,170,255,0.44), 0 0 calc(4px * var(--scale)) rgba(255,255,255,0.65); }
+  .trail-sparkle .spark:nth-child(2){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.98), rgba(160,230,255,0.96) 30%, rgba(100,190,255,0.92) 58%, rgba(40,140,220,0.8) 82%); left:72%; top:42%; }
+  .trail-sparkle .spark:nth-child(3){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.96), rgba(140,210,255,0.95) 30%, rgba(80,170,255,0.9) 58%, rgba(30,120,220,0.76) 82%); left:38%; top:58%; }
+  .trail-sparkle .spark{ animation: trailSparkle 1400ms cubic-bezier(.2,.8,.2,1) forwards; }
+  .trail-sparkle .spark:nth-child(4){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.96), rgba(160,225,255,0.96) 30%, rgba(90,180,255,0.92) 58%, rgba(40,140,220,0.8) 82%); left:58%; top:38%; animation-delay:160ms; }
+  @keyframes trailSparkle { to { transform: translate(-50%,-90%) scale(0.4); opacity: 0; } }
 
   #status{min-height:20px;font-size:calc(14px * var(--scale));text-align:center}
   .small{font-size:calc(12px * var(--scale));opacity:0.9;text-align:center}
@@ -552,6 +576,79 @@ function showExplosionAtCell(cellElem, color = 'orange') {
   setTimeout(() => expl.remove(), 1000);
 }
 
+// show a short-lived trail at the given cell; color is 'red' or 'blue'
+function showTrailAtCell(cellElem, color, destCell){
+  if(!cellElem || !boardWrap) return;
+  try{
+    const cellRect = cellElem.getBoundingClientRect();
+    const wrapRect = boardWrap.getBoundingClientRect();
+    let cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
+    let cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
+    // compute angle towards destCell if provided so the trail orients along movement
+    let angle = 0;
+    let useMidpoint = false;
+    let midX = cx, midY = cy, span = null;
+    if(destCell && destCell !== cellElem){
+      try{
+        const dRect = destCell.getBoundingClientRect();
+        const origCx = cellRect.left + cellRect.width/2 - wrapRect.left;
+        const origCy = cellRect.top + cellRect.height/2 - wrapRect.top;
+        const destCx = dRect.left + dRect.width/2 - wrapRect.left;
+        const destCy = dRect.top + dRect.height/2 - wrapRect.top;
+        const dx = destCx - origCx;
+        const dy = destCy - origCy;
+        angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        // midpoint between origin and dest (in wrap coords)
+        midX = origCx + dx * 0.5;
+        midY = origCy + dy * 0.5;
+        span = Math.hypot(dx, dy);
+        useMidpoint = true;
+      }catch(e){ console.warn('trail calc error', e); }
+    }
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
+    const margin = Math.max(8, 8 * scale);
+  cx = clamp(cx, margin, wrapRect.width - margin);
+  cy = clamp(cy, margin, wrapRect.height - margin);
+  midX = clamp(midX, margin, wrapRect.width - margin);
+  midY = clamp(midY, margin, wrapRect.height - margin);
+
+    const trail = document.createElement('div');
+    trail.className = 'trail ' + (color === 'red' ? 'trail-fire' : 'trail-sparkle');
+    trail.style.position = 'absolute';
+    // position the trail at the midpoint when spanning multiple tiles, otherwise at origin
+    trail.style.left = (useMidpoint ? midX : cx) + 'px';
+    trail.style.top = (useMidpoint ? midY : cy) + 'px';
+    // if we have a span (distance) set the trail width so it stretches between origin and dest
+    if(span){
+      const extra = Math.max(24, 16 * scale);
+      trail.style.width = Math.max(48, span + extra) + 'px';
+      // keep height reasonable
+      trail.style.height = Math.max(28, (24 * scale)) + 'px';
+    }
+    // rotate the whole trail so particle spread follows the movement direction
+    trail.style.transform = `translate(-50%,-50%) rotate(${angle}deg)`;
+    trail.style.zIndex = 16;
+
+    const particleCount = 4; // create same number of particles for both colors
+    for(let i=0;i<particleCount;i++){
+      const el = document.createElement('div');
+      if(color === 'red'){
+        el.className = 'flame';
+      } else {
+        el.className = 'spark';
+      }
+      // stagger slight random delays so particles feel organic
+      const delay = Math.floor(Math.random() * 120);
+      el.style.animationDelay = delay + 'ms';
+      trail.appendChild(el);
+    }
+
+    boardWrap.appendChild(trail);
+    // keep trail visible a bit longer for emphasis (1.8s)
+    setTimeout(()=>{ try{ trail.remove(); }catch(e){} }, 1800);
+  }catch(e){ console.warn('trail error', e); }
+}
+
 // Flowers
 function initFlowers(){
   const field = document.getElementById('flowerField');
@@ -815,6 +912,8 @@ function handleDrop(e, targetCell){
     showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
     playCaptureMelody(Math.min(6, Math.max(1, chainCount + 1)));
     setTimeout(()=>{
+  // leave a trail behind at the origin cell when a pawn moves, oriented toward the destination
+  try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
       targetCell.innerHTML = '';
       targetCell.classList.remove('white','black','captured-red','captured-blue');
       targetCell.classList.add(pawn.dataset.color === 'red' ? 'captured-red' : 'captured-blue');
@@ -854,6 +953,8 @@ function handleDrop(e, targetCell){
   // Non-capture branch — includes single-step moves and double-step first move
   if(existing) return;
   // perform move
+  // leave a trail at the origin cell when a pawn moves, oriented toward the destination
+  try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
   targetCell.appendChild(pawn);
   pawn.classList.remove('dragging');
   pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
