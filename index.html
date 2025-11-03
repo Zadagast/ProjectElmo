@@ -636,7 +636,7 @@ function onCellClick(cell){
   if((currentPlayer === 'red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
   if(cell.querySelector('.pawn')) return;
   if(countPawns(currentPlayer) >= MAX_PAWNS_PER_PLAYER){
-    updateStatus(`${currentPlayer==='red'?'😈 (red)':'😇 (blue)'} already has ${MAX_PAWNS_PER_PLAYER} pawns on the board`);
+    updateStatus(`${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} already has ${MAX_PAWNS_PER_PLAYER} pawns on the board`);
     return;
   }
 
@@ -804,7 +804,7 @@ function checkWinCapturedThreeInRow(playerColor){
 }
 
 function endGame(playerColor){
-  updateStatus(`🏆 ${playerColor === 'red' ? '😈' : '😇'} wins — three captured tiles in a row!`);
+  updateStatus(`🏆 ${playerColor === 'red' ? '🐲' : '🦄'} wins — three captured tiles in a row!`);
   board.querySelectorAll('.cell').forEach(cell => {
     cell.replaceWith(cell.cloneNode(true));
   });
@@ -812,7 +812,7 @@ function endGame(playerColor){
 
 function updateStatus(msg=''){
   if(msg){ status.textContent = msg; return; }
-  status.textContent = `Turn: ${currentPlayer==='red'?'😈 (red)':'😇 (blue)'} | Score 😈: ${scores.red} ⬄ 😇: ${scores.blue}` + (chainMode ? ' — chain active' : '');
+  status.textContent = `Turn: ${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} | Score 🐲: ${scores.red} ⬄ 🦄: ${scores.blue}` + (chainMode ? ' — chain active' : '');
 }
 
 function makePawn(color){
@@ -823,7 +823,7 @@ function makePawn(color){
   // face span ensures emoji sits above pseudo-elements
   const face = document.createElement('span');
   face.className = 'pface';
-  face.textContent = color === 'red' ? '😈' : '😇';
+  face.textContent = color === 'red' ? '🐲' : '🦄';
   pawn.appendChild(face);
 
   function pauseIdle(){ pawn.classList.remove('idle'); }
