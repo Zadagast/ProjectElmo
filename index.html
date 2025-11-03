@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 004.7 — Highlight behind emoji</title>
+<title>Project Elmo 004.7 — Chain capture restriction</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -80,7 +80,7 @@
     filter: drop-shadow(0 calc(8px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.30));
     transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
     transform-origin: center;
-    z-index: 30; /* ensure pawn sits above temporary effects */
+    z-index: 30; /* ensure pawn content sits above temporary effects */
   }
 
   /* face wrapper sits above pseudo-elements */
@@ -237,7 +237,7 @@
   </div>
 
 <script>
-/* Project Elmo 004.7 — highlight behind emoji: full script */
+/* Project Elmo 004.7 — chain capture diagonal restriction + full game script */
 
 // DOM refs
 const board = document.getElementById('board');
@@ -274,6 +274,9 @@ function enableIdleAfterFrame(el){
 
 // clamp helper (keeps values inside bounds)
 function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+
+// small helpers
+function isDiagonal(dx, dy){ return dx === 1 && dy === 1; }
 
 // Web Audio: context + melodic capture
 let audioCtx = null;
@@ -375,7 +378,7 @@ function showPlacementEffect(cellElem){
   setTimeout(()=> pop.remove(), 420);
 }
 
-// Explosion creator (clamped to boardWrap center) — made explicitly visible
+// Explosion creator (clamped to boardWrap center)
 function showExplosionAtCell(cellElem, color = 'orange') {
   if (!cellElem || !boardWrap) return;
   const cellRect = cellElem.getBoundingClientRect();
@@ -392,7 +395,6 @@ function showExplosionAtCell(cellElem, color = 'orange') {
 
   const expl = document.createElement('div');
   expl.className = 'explosion';
-  // ensure visible and non-interactive, placed relative to boardWrap
   expl.style.position = 'absolute';
   expl.style.left = cx + 'px';
   expl.style.top = cy + 'px';
@@ -435,7 +437,7 @@ function showExplosionAtCell(cellElem, color = 'orange') {
   setTimeout(() => expl.remove(), 1000);
 }
 
-// Flower initializer (exposed so we can call it after reset/init)
+// Flower initializer
 function initFlowers(){
   const field = document.getElementById('flowerField');
   if(!field) return;
@@ -497,8 +499,7 @@ function takeSnapshot(){
   };
 }
 
-// applySnapshot restores state without producing new snapshots
-// preserve active player so undo/redo does not change turn
+// applySnapshot restores state without producing new snapshots; preserves currentPlayer
 function applySnapshot(snapshot){
   if(!snapshot || !Array.isArray(snapshot.board)) return;
   suppressSnapshots = true;
@@ -523,7 +524,6 @@ function applySnapshot(snapshot){
       }
     }
 
-    // restore state except active player
     scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
     chainMode = !!snapshot.chainMode;
     chainCount = snapshot.chainCount || 0;
@@ -536,7 +536,6 @@ function applySnapshot(snapshot){
     suppressSnapshots = false;
   }
 
-  // restore preserved player explicitly and refresh UI
   currentPlayer = preservedPlayer;
   updateStatus();
   updateUndoRedoButtons();
@@ -557,7 +556,7 @@ function updateUndoRedoButtons(){
   redoBtn.disabled = redoStack.length === 0;
 }
 
-// undo / redo now preserve currentPlayer
+// undo / redo preserve currentPlayer
 function undo(){
   if(undoStack.length <= 1) return;
   const cur = undoStack.pop();
@@ -622,6 +621,19 @@ function onCellClick(cell){
     updateStatus(`${currentPlayer==='red'?'😈 (red)':'😇 (blue)'} already has ${MAX_PAWNS_PER_PLAYER} pawns on the board`);
     return;
   }
+
+  // If chain is active, block diagonal placement that would not be a capture
+  if(chainMode && chainPawn){
+    const fromIdx = Number(chainPawn.parentElement.dataset.index);
+    const toIdx = idx;
+    const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
+    const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
+    if(isDiagonal(dx,dy)){
+      // diagonal placements must be captures; since cell is empty we block
+      return;
+    }
+  }
+
   const pawn = makePawn(currentPlayer);
   cell.appendChild(pawn);
   pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
@@ -661,6 +673,7 @@ function availableDiagonalCapturesFromCell(cellElem){
   return out;
 }
 
+// handleDrop enforces: during chain, diagonal moves without an opponent pawn are blocked
 function handleDrop(e, targetCell){
   e.preventDefault();
   if(!dragged) return;
@@ -671,7 +684,16 @@ function handleDrop(e, targetCell){
   const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
   const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
   if(!isValidMove(dx,dy)) return;
+
   const existing = targetCell.querySelector('.pawn');
+
+  // If a chain is active, disallow diagonal moves that are not captures
+  if(chainMode && chainPawn){
+    if(isDiagonal(dx,dy) && !(existing && existing.dataset.color !== pawn.dataset.color)){
+      // invalid chain move: diagonal but no opponent pawn to capture
+      return;
+    }
+  }
 
   if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy)){
     existing.classList.add('captured');
