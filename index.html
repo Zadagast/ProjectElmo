@@ -1,0 +1,748 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Project Elmo 002.4 — Larger pieces with rings</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --scale:1.25;
+    --bg1:#0b6b2d;
+    --bg2:#18a058;
+    --tile:calc(60px * var(--scale));
+  }
+  html,body{height:100%;margin:0}
+  body{
+    font-family:system-ui,Segoe UI,Roboto,Arial;
+    background:linear-gradient(150deg,var(--bg1) 0%, #1f9a4f 40%, var(--bg2) 70%);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:calc(18px * var(--scale));
+    box-sizing:border-box;
+    overflow:hidden;
+  }
+
+  .app {
+    width:100%;
+    max-width:calc(820px * var(--scale));
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:calc(12px * var(--scale));
+    position:relative;
+    z-index:2;
+  }
+
+  header{display:flex;flex-direction:column;align-items:center;gap:calc(8px * var(--scale));width:100%}
+  .titleRow {display:flex;align-items:center;gap:calc(12px * var(--scale))}
+  h1{margin:0;font-size:calc(20px * var(--scale))}
+  .vbadge{background:linear-gradient(90deg,#fff6e0,#ffe2a6);color:#6b3f00;padding:calc(6px * var(--scale)) calc(10px * var(--scale));border-radius:999px;font-weight:700;font-size:calc(13px * var(--scale))}
+
+  .panel-backdrop {
+    width:100%;
+    background: rgba(0,0,0,0.10);
+    border-radius:calc(12px * var(--scale));
+    padding:calc(14px * var(--scale));
+    box-shadow: 0 12px 38px rgba(0,0,0,0.14);
+    backdrop-filter: blur(5px);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:calc(12px * var(--scale));
+  }
+
+  #controls{display:flex;flex-wrap:wrap;gap:calc(8px * var(--scale));justify-content:center;width:100%}
+  button{padding:calc(8px * var(--scale)) calc(12px * var(--scale));border-radius:calc(8px * var(--scale));border:0;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:calc(13px * var(--scale))}
+  button:disabled{opacity:.45;cursor:not-allowed}
+
+  #boardWrap{display:flex;justify-content:center;width:100%;position:relative}
+  #board{display:grid;grid-template-columns:repeat(5,var(--tile));grid-gap:calc(6px * var(--scale));margin:0 auto;position:relative;z-index:3}
+  .cell{width:var(--tile);height:var(--tile);display:flex;align-items:center;justify-content:center;border-radius:calc(8px * var(--scale));cursor:pointer}
+  .white{background:#fff;color:#111}.black{background:#333;color:#fff}
+  .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
+
+  /* larger pawns with colored ring */
+  .pawn{
+    position: relative;
+    display: inline-flex;
+    font-size: calc(36px * var(--scale));
+    line-height: 1;
+    width: calc(40px * var(--scale));
+    height: calc(40px * var(--scale));
+    align-items:center; justify-content:center;
+    border-radius:50%;
+    cursor:grab;
+    user-select:none;
+    box-shadow: 0 calc(10px * var(--scale)) calc(26px * var(--scale)) rgba(0,0,0,0.48), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02);
+    filter: drop-shadow(0 calc(8px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.30));
+    transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
+    transform-origin: center;
+  }
+
+  /* colored ring drawn behind the pawn (matches pawn color) */
+  .pawn::before{
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%,-50%) scale(1);
+    width: calc(66px * var(--scale));
+    height: calc(66px * var(--scale));
+    border-radius: 50%;
+    z-index: -1;
+    opacity: 0.14;
+    transition: opacity 180ms ease, transform 180ms ease;
+    pointer-events: none;
+    box-shadow: 0 0 calc(18px * var(--scale)) rgba(0,0,0,0.18) inset;
+  }
+
+  /* color the ring per piece color */
+  .pawn[data-color="red"]::before{ background: radial-gradient(circle at 50% 40%, rgba(255,180,180,0.95), rgba(255,120,120,0.9) 45%, transparent 55%); opacity: 0.20; }
+  .pawn[data-color="blue"]::before{ background: radial-gradient(circle at 50% 40%, rgba(180,220,255,0.95), rgba(120,180,255,0.9) 45%, transparent 55%); opacity: 0.20; }
+
+  /* hover/drag lift increases ring visibility */
+  .pawn:hover::before, .pawn.dragging::before{
+    transform: translate(-50%,-50%) scale(1.06);
+    opacity: 0.28;
+  }
+
+  /* captured tiles keep a matching outline for clarity */
+  .captured-red{ background:#ff6b6b; box-shadow: 0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02); outline: calc(3px * var(--scale)) solid rgba(255,120,120,0.24); }
+  .captured-blue{ background:#6bb2ff; box-shadow: 0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02); outline: calc(3px * var(--scale)) solid rgba(120,180,255,0.24); }
+
+  /* ensure pawn emoji stays visually centered when enlarged */
+  .pawn img, .pawn svg { width: 100%; height: 100%; object-fit:contain; }
+
+  #status{min-height:20px;font-size:calc(14px * var(--scale));text-align:center}
+  .small{font-size:calc(12px * var(--scale));opacity:0.9;text-align:center}
+
+  /* Flower sprinkle background (behind UI) */
+  .flower-field { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .flower { position: absolute; opacity: var(--opa,0.22); transform-origin: center; will-change: transform, opacity; animation: flowerFloat var(--dur) linear infinite; user-select: none; font-family: serif; }
+  @keyframes flowerFloat {
+    0% { transform: translateY(0) rotate(0deg) scale(var(--scaleF,1)); opacity: var(--opa,0.22); }
+    50% { transform: translateY(-8px) rotate(var(--rot,0deg)) scale(calc(var(--scaleF,1) * 1.03)); opacity: calc(var(--opa,0.22) + 0.06); }
+    100% { transform: translateY(0) rotate(calc(var(--rot,0deg) * -1)) scale(var(--scaleF,1)); opacity: var(--opa,0.22); }
+  }
+
+  .explosion { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: calc(260px * var(--scale)); height: calc(260px * var(--scale)); z-index: 6; }
+  .explosion .ring { position: absolute; left:50%; top:50%; width:calc(40px * var(--scale)); height:calc(40px * var(--scale)); border-radius:50%; transform:translate(-50%,-50%) scale(0.3); border:calc(7px * var(--scale)) solid rgba(255,230,150,0.98); animation: ringPop 560ms cubic-bezier(.1,.9,.2,1) forwards; }
+  @keyframes ringPop { to { transform: translate(-50%,-50%) scale(6.0); opacity: 0; } }
+  .explosion .flash { position:absolute; left:50%; top:50%; width:calc(100px * var(--scale)); height:calc(100px * var(--scale)); transform:translate(-50%,-50%) scale(0.6); background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.98), rgba(255,220,120,0.95) 50%, transparent 70%); border-radius:50%; opacity:0.98; animation: flashPop 280ms cubic-bezier(.2,.9,.3,1) forwards; mix-blend-mode:screen; }
+  @keyframes flashPop { to { transform: translate(-50%,-50%) scale(2.6); opacity:0; } }
+  .explosion .shock { position:absolute; left:50%; top:50%; width:calc(160px * var(--scale)); height:calc(160px * var(--scale)); transform:translate(-50%,-50%) scale(0.2); border-radius:50%; background: radial-gradient(circle, rgba(255,240,160,0.12), rgba(255,160,60,0.06) 45%, transparent 60%); opacity:0.9; animation: shockPop 560ms cubic-bezier(.1,.9,.2,1) forwards; mix-blend-mode:screen; }
+  @keyframes shockPop { to { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
+  .explosion .particle { position:absolute; left:50%; top:50%; width:calc(14px * var(--scale)); height:calc(14px * var(--scale)); border-radius:50%; opacity:1; transform-origin:center; animation: particleFly 760ms cubic-bezier(.12,.85,.28,1) forwards; box-shadow:0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32); background: radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b; }
+  @keyframes particleFly { to { transform: translate(var(--tx), var(--ty)) scale(0.36); opacity: 0; filter: blur(0.8px); } }
+
+  @media (max-width:520px){
+    :root{--scale:1; --tile:48px}
+    h1{font-size:18px}
+    .panel-backdrop{padding:10px}
+    button{padding:7px 10px}
+  }
+</style>
+</head>
+<body>
+  <div class="flower-field" id="flowerField" aria-hidden="true"></div>
+
+  <div class="app" role="application" aria-label="Project Elmo">
+    <div class="panel-backdrop">
+      <header>
+        <div class="titleRow">
+          <h1>Project Elmo</h1>
+          <div class="vbadge">002.4</div>
+        </div>
+        <div id="status" class="small" aria-live="polite"></div>
+      </header>
+
+      <div id="controls">
+        <button id="resetBtn">Reset</button>
+        <button id="undoBtn" disabled>Undo</button>
+        <button id="redoBtn" disabled>Redo</button>
+      </div>
+
+      <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
+    </div>
+  </div>
+
+<script>
+/* Project Elmo 002.4 — Full client (larger pieces + colored rings) */
+
+// DOM refs
+const board = document.getElementById('board');
+const boardWrap = document.getElementById('boardWrap');
+const status = document.getElementById('status');
+const resetBtn = document.getElementById('resetBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+let currentPlayer = 'red';
+let dragged = null;
+let chainMode = false;
+let chainPawn = null;
+let chainCount = 0;
+let scores = { red:0, blue:0 };
+
+const undoStack = [];
+const redoStack = [];
+let suppressSnapshots = false;
+
+// Web Audio: context + melodic capture
+let audioCtx = null;
+function ensureAudioContext(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+function playCaptureMelody(level = 1, dest = null){
+  try {
+    ensureAudioContext();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
+    const now = audioCtx.currentTime;
+    const out = dest || audioCtx.destination;
+    const baseFreq = 440;
+    const seq = [0, 3, 7, 12];
+    const tempo = 0.12;
+    const gainMaster = audioCtx.createGain(); gainMaster.gain.value = 0.12 * Math.min(1.6, 0.6 + 0.12 * level); gainMaster.connect(out);
+    seq.forEach((semi, i) => {
+      const t = now + i * tempo * (0.95 + Math.random() * 0.06);
+      const freq = baseFreq * Math.pow(2, (semi + (level-1)*1.2) / 12);
+      const osc = audioCtx.createOscillator();
+      const osc2 = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      const filt = audioCtx.createBiquadFilter();
+      osc.type = 'sine';
+      osc2.type = 'triangle';
+      osc.frequency.setValueAtTime(freq * (0.98 + Math.random() * 0.02), t);
+      osc2.frequency.setValueAtTime(freq * 1.98, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(1.0 * (0.12 + level * 0.02), t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + tempo * 0.92);
+      filt.type = 'highpass';
+      filt.frequency.value = 120 + level * 10;
+      osc.connect(filt);
+      osc2.connect(filt);
+      filt.connect(g);
+      g.connect(gainMaster);
+      osc.start(t);
+      osc.stop(t + tempo * 0.95);
+      osc2.start(t);
+      osc2.stop(t + tempo * 0.95);
+    });
+    const t2 = now + seq.length * tempo;
+    const glissOsc = audioCtx.createOscillator();
+    const glissGain = audioCtx.createGain();
+    glissOsc.type = 'sine';
+    glissOsc.frequency.setValueAtTime(baseFreq * Math.pow(2, (12 + (level-1)*1.6) / 12), t2);
+    glissGain.gain.setValueAtTime(0.0001, t2);
+    glissGain.gain.linearRampToValueAtTime(0.06 * Math.min(1.8, 0.5 + level*0.08), t2 + 0.01);
+    glissGain.gain.exponentialRampToValueAtTime(0.0001, t2 + 0.36);
+    glissOsc.connect(glissGain); glissGain.connect(out);
+    glissOsc.start(t2); glissOsc.stop(t2 + 0.36);
+  } catch (e) { console.warn('Audio error', e); }
+}
+
+// Placement sound (short click)
+function playPlacementSound(){
+  try{
+    ensureAudioContext();
+    const now = audioCtx.currentTime;
+    const gain = audioCtx.createGain(); gain.gain.value = 0.08; gain.connect(audioCtx.destination);
+    const osc = audioCtx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(660, now);
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.09);
+    const env = audioCtx.createGain(); env.gain.setValueAtTime(0.0001, now);
+    env.gain.linearRampToValueAtTime(1.0, now + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+    osc.connect(env); env.connect(gain);
+    osc.start(now); osc.stop(now + 0.18);
+  }catch(e){ /* silent fail */ }
+}
+
+// Visual placement effect: cell pulse + tiny pop
+function showPlacementEffect(cellElem){
+  if(!cellElem) return;
+  cellElem.style.transition = 'transform 140ms ease, box-shadow 140ms ease';
+  cellElem.style.transform = 'scale(1.06)';
+  setTimeout(()=> { cellElem.style.transform = ''; }, 140);
+
+  const wrap = boardWrap;
+  const rect = cellElem.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  const px = rect.left + rect.width/2 - wrapRect.left;
+  const py = rect.top + rect.height/2 - wrapRect.top;
+
+  const pop = document.createElement('div');
+  pop.className = 'placement-pop';
+  pop.style.position = 'absolute';
+  pop.style.left = px + 'px';
+  pop.style.top = py + 'px';
+  pop.style.width = '8px';
+  pop.style.height = '8px';
+  pop.style.borderRadius = '50%';
+  pop.style.pointerEvents = 'none';
+  pop.style.transform = 'translate(-50%,-50%) scale(0.2)';
+  pop.style.background = 'rgba(255,255,255,0.95)';
+  pop.style.boxShadow = '0 4px 12px rgba(0,0,0,0.28)';
+  pop.style.zIndex = 8;
+  pop.style.transition = 'transform 360ms cubic-bezier(.2,.9,.3,1), opacity 360ms ease';
+  boardWrap.appendChild(pop);
+  requestAnimationFrame(()=> {
+    pop.style.transform = 'translate(-50%,-50%) scale(1.6)';
+    pop.style.opacity = '0';
+  });
+  setTimeout(()=> pop.remove(), 420);
+}
+
+// Tripled, more opaque flower initializer
+(function initFlowers(){
+  const field = document.getElementById('flowerField');
+  if(!field) return;
+  field.style.willChange = 'transform,opacity';
+  field.innerHTML = '';
+  const emojis = ['🌸','🌼','🌺','🌻','🌷'];
+  const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+  const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+  const base = Math.round(Math.min(40, Math.max(6, (vw * vh) / (1400 * 800) * 6)));
+  const count = Math.max(8, base) * 3; // tripled
+  for (let i = 0; i < count; i++){
+    const s = document.createElement('span');
+    s.className = 'flower';
+    s.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    s.style.left = (Math.random() * 120 - 10) + '%';
+    s.style.top = (Math.random() * 120 - 10) + '%';
+    s.style.setProperty('--dur', (5 + Math.random() * 8).toFixed(2) + 's');
+    s.style.setProperty('--scaleF', (0.8 + Math.random() * 0.9).toFixed(2));
+    s.style.setProperty('--rot', (Math.random() * 90 - 45).toFixed(1) + 'deg');
+    s.style.setProperty('--opa', (0.18 + Math.random() * 0.20).toFixed(2)); // more opaque per-flower
+    s.style.fontSize = Math.round(12 + Math.random() * 22) + 'px';
+    s.style.filter = 'none';
+    field.appendChild(s);
+  }
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      field.innerHTML = '';
+      initFlowers();
+    }, 300);
+  });
+})();
+
+// Pawn factory with chain guard on dragstart/pointerdown
+function makePawn(color){
+  const pawn = document.createElement('div');
+  pawn.className = 'pawn';
+  pawn.textContent = color === 'red' ? '😈' : '😇';
+  pawn.draggable = true;
+  pawn.dataset.color = color;
+
+  pawn.addEventListener('dragstart', (ev) => {
+    if(chainMode && chainPawn){
+      const cpCell = chainPawn.parentElement;
+      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+        chainMode = false;
+        chainPawn = null;
+        chainCount = 0;
+        dragged = null;
+        recordSnapshot({ countAsMove: true });
+        if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+        ev.preventDefault();
+        return;
+      }
+      if (pawn !== chainPawn) { ev.preventDefault(); return; }
+    }
+    if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); return; }
+    dragged = pawn; pawn.classList.add('dragging');
+    try { ev.dataTransfer.setData('text/plain','drag'); } catch(e){}
+  });
+  pawn.addEventListener('dragend', () => pawn.classList.remove('dragging'));
+
+  pawn.addEventListener('pointerdown', (ev) => {
+    if(chainMode && chainPawn){
+      const cpCell = chainPawn.parentElement;
+      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+        chainMode = false;
+        chainPawn = null;
+        chainCount = 0;
+        dragged = null;
+        recordSnapshot({ countAsMove: true });
+        if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+        return;
+      }
+      if (pawn !== chainPawn) return;
+    }
+    if (pawn.dataset.color !== currentPlayer) return;
+    try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
+    dragged = pawn; pawn.classList.add('dragging');
+  });
+  pawn.addEventListener('pointerup', (ev) => {
+    try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
+    setTimeout(()=> pawn.classList.remove('dragging'),40);
+  });
+
+  return pawn;
+}
+
+// Explosion creator
+function showExplosionAtCell(cellElem, color = 'orange') {
+  if (!cellElem || !boardWrap) return;
+  const cellRect = cellElem.getBoundingClientRect();
+  const wrapRect = boardWrap.getBoundingClientRect();
+  const cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
+  const cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
+
+  const expl = document.createElement('div');
+  expl.className = 'explosion';
+  expl.style.left = cx + 'px';
+  expl.style.top = cy + 'px';
+
+  const ring = document.createElement('div');
+  ring.className = 'ring';
+  ring.style.borderColor = color === 'red' ? 'rgba(255,140,140,0.98)' : 'rgba(140,200,255,0.98)';
+  expl.appendChild(ring);
+
+  const flash = document.createElement('div');
+  flash.className = 'flash';
+  expl.appendChild(flash);
+
+  const shock = document.createElement('div');
+  shock.className = 'shock';
+  expl.appendChild(shock);
+
+  const total = 20;
+  for (let i = 0; i < total; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (i / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.9;
+    const dist = (50 + Math.random() * 90) * parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale') || 1);
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist;
+    p.style.setProperty('--tx', tx + 'px');
+    p.style.setProperty('--ty', ty + 'px');
+    p.style.width = (8 + Math.random() * 14) + 'px';
+    p.style.height = p.style.width;
+    p.style.animationDelay = (Math.random() * 120) + 'ms';
+    p.style.background = (i % 3 === 0) ? 'radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ff9f6b' : 'radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b';
+    expl.appendChild(p);
+  }
+
+  boardWrap.appendChild(expl);
+  setTimeout(() => expl.remove(), 1000);
+}
+
+// Snapshot helpers
+function takeSnapshot(){
+  const boardArr = new Array(25).fill(null);
+  for(let i=0;i<25;i++){
+    const cell = board.children[i];
+    if(!cell) continue;
+    const pawnEl = cell.querySelector('.pawn');
+    if(pawnEl){
+      boardArr[i] = { pawn: pawnEl.dataset.color, captured: cell.classList.contains('captured-red') || cell.classList.contains('captured-blue') };
+    } else if (cell.classList.contains('captured-red')){
+      boardArr[i] = { pawn:'red', captured:true };
+    } else if (cell.classList.contains('captured-blue')){
+      boardArr[i] = { pawn:'blue', captured:true };
+    } else {
+      boardArr[i] = null;
+    }
+  }
+  return {
+    board: boardArr,
+    currentPlayer,
+    scores: { red: scores.red, blue: scores.blue },
+    chainMode: !!chainMode,
+    chainCount: chainCount || 0,
+    chainPawnIdx: (chainPawn && chainPawn.parentElement) ? Number(chainPawn.parentElement.dataset.index) : null,
+    ts: Date.now()
+  };
+}
+
+// recordSnapshot accepts option to mark whether this snapshot counts as a player move
+function recordSnapshot(opts = { countAsMove: true }){
+  if(suppressSnapshots) return;
+  const { countAsMove } = opts;
+  undoStack.push(takeSnapshot());
+  undoStack[undoStack.length - 1].__countAsMove = !!countAsMove;
+  if(countAsMove){
+    redoStack.length = 0;
+  }
+  updateUndoRedoButtons();
+}
+
+// applySnapshot restores state without producing new snapshots
+function applySnapshot(snapshot){
+  if(!snapshot || !Array.isArray(snapshot.board)) return;
+  suppressSnapshots = true;
+  try{
+    for(let i=0;i<25;i++){
+      const cell = board.children[i];
+      if(!cell) continue;
+      cell.innerHTML = '';
+      cell.classList.remove('captured-red','captured-blue','white','black');
+      cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
+    }
+    for(let i=0;i<25;i++){
+      const entry = snapshot.board[i];
+      const cell = board.children[i];
+      if(!cell) continue;
+      if(entry && entry.pawn){
+        if(entry.captured) cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
+        const pawn = makePawn(entry.pawn);
+        cell.appendChild(pawn);
+      }
+    }
+    currentPlayer = snapshot.currentPlayer;
+    scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
+    chainMode = !!snapshot.chainMode;
+    chainCount = snapshot.chainCount || 0;
+    chainPawn = null;
+    if(typeof snapshot.chainPawnIdx === 'number' && snapshot.chainPawnIdx >= 0 && snapshot.chainPawnIdx < 25){
+      const cpCell = board.children[snapshot.chainPawnIdx];
+      if(cpCell) chainPawn = cpCell.querySelector('.pawn');
+    }
+  } finally {
+    suppressSnapshots = false;
+  }
+  updateStatus();
+  updateUndoRedoButtons();
+}
+
+function updateUndoRedoButtons(){
+  undoBtn.disabled = undoStack.length <= 1;
+  redoBtn.disabled = redoStack.length === 0;
+}
+
+// undo / redo now restore state and do not create new move snapshots
+function undo(){
+  if(undoStack.length <= 1) return;
+  const cur = undoStack.pop();
+  redoStack.push(cur);
+  const prev = undoStack[undoStack.length - 1];
+  if(prev) applySnapshot(prev);
+  updateStatus('Undid action');
+}
+
+function redo(){
+  if(redoStack.length === 0) return;
+  const snap = redoStack.pop();
+  applySnapshot(snap);
+  undoStack.push(snap);
+  updateStatus('Redid action');
+}
+
+// board init and interaction
+function resetBoard(){
+  board.innerHTML = '';
+  scores = { red:0, blue:0 };
+  currentPlayer = 'red';
+  dragged = null; chainMode = false; chainPawn = null; chainCount = 0;
+  for(let i=0;i<25;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (((Math.floor(i/5) + i%5) % 2 === 0) ? 'white' : 'black');
+    cell.dataset.index = i;
+    cell.addEventListener('click', ()=> onCellClick(cell));
+    cell.addEventListener('dragover', e=>e.preventDefault());
+    cell.addEventListener('drop', e=> handleDrop(e, cell));
+    board.appendChild(cell);
+  }
+  undoStack.length = 0; redoStack.length = 0;
+  undoStack.push(takeSnapshot());
+  updateUndoRedoButtons();
+  updateStatus();
+}
+
+function onCellClick(cell){
+  const idx = Number(cell.dataset.index);
+  const row = Math.floor(idx / 5);
+  if((currentPlayer === 'red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
+  if(cell.querySelector('.pawn')) return;
+  const pawn = makePawn(currentPlayer);
+  cell.appendChild(pawn);
+
+  // placement feedback
+  playPlacementSound();
+  showPlacementEffect(cell);
+
+  // record as a real player move
+  recordSnapshot({ countAsMove: true });
+
+  // check win after placement
+  if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+}
+
+function isValidMove(dx,dy){ return dx <= 1 && dy <= 1 && (dx + dy > 0); }
+function isValidCapture(dx,dy){ return dx === 1 && dy === 1; }
+
+function availableDiagonalCapturesFromCell(cellElem){
+  if(!cellElem) return [];
+  const idx = Number(cellElem.dataset.index); const x = idx % 5; const y = Math.floor(idx/5);
+  const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+  const out = [];
+  const pawn = cellElem.querySelector('.pawn'); if(!pawn) return [];
+  for(const [dx,dy] of dirs){
+    const nx = x + dx, ny = y + dy;
+    if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
+    const nIdx = ny*5 + nx; const neighbor = board.children[nIdx];
+    const occ = neighbor.querySelector('.pawn');
+    if(occ && occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+  }
+  return out;
+}
+
+// Updated handleDrop: chain continuation if captures remain, otherwise end chain and turn
+function handleDrop(e, targetCell){
+  e.preventDefault();
+  if(!dragged) return;
+  const pawn = dragged;
+  const fromCell = pawn.parentElement;
+  if(!fromCell){ dragged = null; return; }
+  const fromIdx = Number(fromCell.dataset.index), toIdx = Number(targetCell.dataset.index);
+  const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
+  const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
+  if(!isValidMove(dx,dy)) return;
+  const existing = targetCell.querySelector('.pawn');
+
+  if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy)){
+    existing.classList.add('captured');
+
+    showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
+    playCaptureMelody(Math.min(6, Math.max(1, chainCount + 1)));
+
+    setTimeout(()=>{
+      targetCell.innerHTML = '';
+      targetCell.classList.remove('white','black','captured-red','captured-blue');
+      targetCell.classList.add(pawn.dataset.color === 'red' ? 'captured-red' : 'captured-blue');
+      targetCell.appendChild(pawn);
+      pawn.classList.remove('dragging');
+
+      scores[currentPlayer]++; chainCount++;
+
+      showCaptureEffect(targetCell, pawn.dataset.color);
+
+      const further = availableDiagonalCapturesFromCell(targetCell);
+
+      // record the capture as a real move snapshot
+      recordSnapshot({ countAsMove: true });
+
+      if(further.length > 0){
+        chainMode = true;
+        chainPawn = pawn;
+        dragged = pawn;
+        updateStatus(`Chain x${chainCount}`);
+      } else {
+        chainMode = false;
+        chainPawn = null;
+        chainCount = 0;
+        dragged = null;
+        if(checkWinCapturedThreeInRow(currentPlayer)) return;
+        switchTurn();
+      }
+    }, 220);
+    return;
+  }
+
+  if(existing) return;
+  targetCell.appendChild(pawn);
+  pawn.classList.remove('dragging');
+
+  // placement feedback for non-capture placement
+  playPlacementSound();
+  showPlacementEffect(targetCell);
+
+  // record regular move
+  recordSnapshot({ countAsMove: true });
+
+  if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+}
+
+function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; }
+
+function showCaptureEffect(cell,color){
+  cell.style.transition = 'transform .18s ease, box-shadow .18s ease';
+  cell.style.transform = 'scale(1.04)';
+  setTimeout(()=>{ cell.style.transform = ''; }, 160);
+}
+
+// NEW WIN: three captured tiles in a row (rows, columns, diagonals)
+function capturedOwnerOf(index){
+  const cell = board.children[index];
+  if(!cell) return null;
+  if(cell.classList.contains('captured-red')) return 'red';
+  if(cell.classList.contains('captured-blue')) return 'blue';
+  return null;
+}
+
+function checkCapturedRunOfThreeForColor(color){
+  for(let r=0;r<5;r++){
+    for(let c=0;c<=2;c++){
+      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf(r*5 + c+1) === color && capturedOwnerOf(r*5 + c+2) === color) return true;
+    }
+  }
+  for(let c=0;c<5;c++){
+    for(let r=0;r<=2;r++){
+      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c) === color && capturedOwnerOf((r+2)*5 + c) === color) return true;
+    }
+  }
+  for(let r=0;r<=2;r++){
+    for(let c=0;c<=2;c++){
+      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c+1) === color && capturedOwnerOf((r+2)*5 + c+2) === color) return true;
+    }
+  }
+  for(let r=2;r<5;r++){
+    for(let c=0;c<=2;c++){
+      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r-1)*5 + c+1) === color && capturedOwnerOf((r-2)*5 + c+2) === color) return true;
+    }
+  }
+  return false;
+}
+
+function checkWinCapturedThreeInRow(playerColor){
+  if(checkCapturedRunOfThreeForColor(playerColor)){
+    endGame(playerColor);
+    return true;
+  }
+  return false;
+}
+
+function endGame(playerColor){
+  updateStatus(`🏆 ${playerColor === 'red' ? '😈' : '😇'} wins — three captured tiles in a row!`);
+  board.querySelectorAll('.cell').forEach(cell => {
+    cell.replaceWith(cell.cloneNode(true));
+  });
+}
+
+function updateStatus(msg=''){
+  if(msg){ status.textContent = msg; return; }
+  status.textContent = `Turn: ${currentPlayer==='red'?'😈 (red)':'😇 (blue)'} | Score 😈: ${scores.red} ⬄ 😇: ${scores.blue}` + (chainMode ? ' — chain active' : '');
+}
+
+// initialization
+function init(){
+  board.innerHTML = '';
+  for(let i=0;i<25;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (((Math.floor(i/5) + i%5) % 2 === 0) ? 'white' : 'black');
+    cell.dataset.index = i;
+    cell.addEventListener('click', ()=> onCellClick(cell));
+    cell.addEventListener('dragover', e=>e.preventDefault());
+    cell.addEventListener('drop', e=> handleDrop(e, cell));
+    board.appendChild(cell);
+  }
+  undoStack.length = 0; redoStack.length = 0;
+  undoStack.push(takeSnapshot());
+  updateUndoRedoButtons();
+  updateStatus();
+}
+
+resetBtn.addEventListener('click', () => resetBoard());
+undoBtn.addEventListener('click', () => undo());
+redoBtn.addEventListener('click', () => redo());
+
+init();
+
+// debug helpers
+window.__PE = { undoStack, redoStack, takeSnapshot: ()=> undoStack[undoStack.length-1], applySnapshot };
+</script>
+</body>
+</html>
