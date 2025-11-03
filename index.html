@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 004.7 — Preserve turn on undo</title>
+<title>Project Elmo 004.7 — Highlight behind emoji</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -80,7 +80,11 @@
     filter: drop-shadow(0 calc(8px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.30));
     transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
     transform-origin: center;
+    z-index: 30; /* ensure pawn sits above temporary effects */
   }
+
+  /* face wrapper sits above pseudo-elements */
+  .pawn .pface { position: relative; z-index: 31; pointer-events: none; display: inline-block; line-height:1; }
 
   /* idle wiggle */
   @keyframes pawnIdleSquashWiggle {
@@ -106,7 +110,7 @@
     width: calc(52px * var(--scale));
     height: calc(52px * var(--scale));
     border-radius: 50%;
-    z-index: -1;
+    z-index: 10; /* behind emoji but above effects */
     opacity: 1;
     transition: opacity 100ms linear, transform 120ms ease, box-shadow 120ms ease;
     pointer-events: none;
@@ -126,7 +130,7 @@
     width: calc(72px * var(--scale));
     height: calc(72px * var(--scale));
     border-radius:50%;
-    z-index:-2;
+    z-index: 8; /* glow behind highlight and emoji */
     opacity: 0.85;
     pointer-events:none;
     filter: blur(calc(6px * var(--scale))) saturate(1.25);
@@ -170,7 +174,7 @@
   }
 
   /* explosion and particle internals rely on these classes — keep them visible */
-  .explosion { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: calc(260px * var(--scale)); height: calc(260px * var(--scale)); z-index: 9999; }
+  .explosion { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: calc(260px * var(--scale)); height: calc(260px * var(--scale)); z-index: 18; }
   .explosion .ring { position: absolute; left:50%; top:50%; width:calc(40px * var(--scale)); height:calc(40px * var(--scale)); border-radius:50%; transform:translate(-50%,-50%) scale(0.3); border:calc(7px * var(--scale)) solid rgba(255,230,150,0.98); animation: ringPop 560ms cubic-bezier(.1,.9,.2,1) forwards; }
   @keyframes ringPop { to { transform: translate(-50%,-50%) scale(6.0); opacity: 0; } }
   .explosion .flash { position:absolute; left:50%; top:50%; width:calc(100px * var(--scale)); height:calc(100px * var(--scale)); transform:translate(-50%,-50%) scale(0.6); background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.98), rgba(255,220,120,0.95) 50%, transparent 70%); border-radius:50%; opacity:0.98; animation: flashPop 280ms cubic-bezier(.2,.9,.3,1) forwards; mix-blend-mode:screen; }
@@ -233,7 +237,7 @@
   </div>
 
 <script>
-/* Project Elmo 004.7 — clamped effects + explosion visibility + preserve currentPlayer on undo/redo */
+/* Project Elmo 004.7 — highlight behind emoji: full script */
 
 // DOM refs
 const board = document.getElementById('board');
@@ -393,7 +397,7 @@ function showExplosionAtCell(cellElem, color = 'orange') {
   expl.style.left = cx + 'px';
   expl.style.top = cy + 'px';
   expl.style.pointerEvents = 'none';
-  expl.style.zIndex = 9999;
+  expl.style.zIndex = 18;
 
   const ring = document.createElement('div');
   ring.className = 'ring';
@@ -429,6 +433,40 @@ function showExplosionAtCell(cellElem, color = 'orange') {
 
   boardWrap.appendChild(expl);
   setTimeout(() => expl.remove(), 1000);
+}
+
+// Flower initializer (exposed so we can call it after reset/init)
+function initFlowers(){
+  const field = document.getElementById('flowerField');
+  if(!field) return;
+  field.style.willChange = 'transform,opacity';
+  field.innerHTML = '';
+  const emojis = ['🌸','🌼','🌺','🌻','🌷'];
+  const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+  const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+  const base = Math.round(Math.min(40, Math.max(6, (vw * vh) / (1400 * 800) * 6)));
+  const count = Math.max(8, base) * 3;
+  for (let i = 0; i < count; i++){
+    const s = document.createElement('span');
+    s.className = 'flower';
+    s.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    s.style.left = (Math.random() * 120 - 10) + '%';
+    s.style.top = (Math.random() * 120 - 10) + '%';
+    s.style.setProperty('--dur', (5 + Math.random() * 8).toFixed(2) + 's');
+    s.style.setProperty('--scaleF', (0.8 + Math.random() * 0.9).toFixed(2));
+    s.style.setProperty('--rot', (Math.random() * 90 - 45).toFixed(1) + 'deg');
+    s.style.setProperty('--opa', (0.18 + Math.random() * 0.20).toFixed(2));
+    s.style.fontSize = Math.round(12 + Math.random() * 22) + 'px';
+    field.appendChild(s);
+  }
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      field.innerHTML = '';
+      initFlowers();
+    }, 300);
+  });
 }
 
 // Snapshot helpers
@@ -570,6 +608,9 @@ function resetBoard(){
   undoStack.push(takeSnapshot());
   updateUndoRedoButtons();
   updateStatus();
+
+  // ensure flowers are present after reset
+  if (typeof initFlowers === 'function') initFlowers();
 }
 
 function onCellClick(cell){
@@ -737,9 +778,13 @@ function updateStatus(msg=''){
 function makePawn(color){
   const pawn = document.createElement('div');
   pawn.className = 'pawn';
-  pawn.textContent = color === 'red' ? '😈' : '😇';
   pawn.draggable = true;
   pawn.dataset.color = color;
+  // face span ensures emoji sits above pseudo-elements
+  const face = document.createElement('span');
+  face.className = 'pface';
+  face.textContent = color === 'red' ? '😈' : '😇';
+  pawn.appendChild(face);
 
   function pauseIdle(){ pawn.classList.remove('idle'); }
   function resumeIdle(){ if(prefersReducedMotion) return; setTimeout(()=> { if(!pawn.classList.contains('dragging') && document.contains(pawn)) pawn.classList.add('idle'); }, 60); }
@@ -810,6 +855,10 @@ undoBtn.addEventListener('click', () => undo());
 redoBtn.addEventListener('click', () => redo());
 
 init();
+
+// ensure flowers are created after UI build (also safe on load)
+if (typeof initFlowers === 'function') initFlowers();
+window.addEventListener('load', () => { if (typeof initFlowers === 'function') initFlowers(); });
 
 // debug helpers
 window.__PE = { undoStack, redoStack, takeSnapshot: ()=> undoStack[undoStack.length-1], applySnapshot, countPawns };
