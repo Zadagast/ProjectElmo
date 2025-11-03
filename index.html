@@ -770,6 +770,7 @@ function undo(){
   if(prev) {
     applySnapshot(prev);
     // Turn and chain attack state are restored from snapshot
+    scheduleAiIfNeeded(240);
   }
   updateStatus(); // Always show scoreboard
 }
@@ -779,7 +780,7 @@ function redo(){
   applySnapshot(snap);
   undoStack.push(snap);
   updateStatus(); // Always show scoreboard
-  _postUndoRedo();
+  scheduleAiIfNeeded(240);
 }
 // Ensure AI is scheduled if undo/redo left it as the active player
 function _postUndoRedo(){ scheduleAiIfNeeded(240); }
