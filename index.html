@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 004.7 — Swipe controls</title>
+<title>Project Elmo 004.7 — Project Elmo</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -24,47 +24,24 @@
     overflow:hidden;
   }
 
-  .app {
-    width:100%;
-    max-width:calc(820px * var(--scale));
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:calc(12px * var(--scale));
-    position:relative;
-    z-index:2;
-  }
-
+  .app { width:100%; max-width:calc(820px * var(--scale)); display:flex; flex-direction:column; align-items:center; gap:calc(12px * var(--scale)); position:relative; z-index:2; }
   header{display:flex;flex-direction:column;align-items:center;gap:calc(8px * var(--scale));width:100%}
   .titleRow {display:flex;align-items:center;gap:calc(12px * var(--scale))}
   h1{margin:0;font-size:calc(20px * var(--scale))}
   .vbadge{background:linear-gradient(90deg,#fff6e0,#ffe2a6);color:#6b3f00;padding:calc(6px * var(--scale)) calc(10px * var(--scale));border-radius:999px;font-weight:700;font-size:calc(13px * var(--scale))}
 
-  .panel-backdrop {
-    width:100%;
-    background: rgba(0,0,0,0.10);
-    border-radius:calc(12px * var(--scale));
-    padding:calc(14px * var(--scale));
-    box-shadow: 0 12px 38px rgba(0,0,0,0.14);
-    backdrop-filter: blur(5px);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    gap:calc(12px * var(--scale));
-  }
+  .panel-backdrop { width:100%; background: rgba(0,0,0,0.10); border-radius:calc(12px * var(--scale)); padding:calc(14px * var(--scale)); box-shadow: 0 12px 38px rgba(0,0,0,0.14); backdrop-filter: blur(5px); display:flex; flex-direction:column; align-items:center; gap:calc(12px * var(--scale)); }
 
   #controls{display:flex;flex-wrap:wrap;gap:calc(8px * var(--scale));justify-content:center;width:100%}
   button{padding:calc(8px * var(--scale)) calc(12px * var(--scale));border-radius:calc(8px * var(--scale));border:0;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:calc(13px * var(--scale))}
   button:disabled{opacity:.45;cursor:not-allowed}
 
-  /* clip overflow so temporary effects can't escape */
   #boardWrap{display:flex;justify-content:center;width:100%;position:relative;overflow:hidden}
   #board{display:grid;grid-template-columns:repeat(5,var(--tile));grid-gap:calc(6px * var(--scale));margin:0 auto;position:relative;z-index:3}
   .cell{width:var(--tile);height:var(--tile);display:flex;align-items:center;justify-content:center;border-radius:calc(8px * var(--scale));cursor:pointer}
   .white{background:#fff;color:#111}.black{background:#333;color:#fff}
   .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
 
-  /* pawn base */
   .pawn{
     position: relative;
     display: inline-flex;
@@ -80,14 +57,11 @@
     filter: drop-shadow(0 calc(8px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.30));
     transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
     transform-origin: center;
-    z-index: 30; /* ensure pawn content sits above temporary effects */
-    touch-action: none; /* let pointer events drive swipe detection on touch */
+    z-index: 30;
+    touch-action: none;
   }
-
-  /* face wrapper sits above pseudo-elements */
   .pawn .pface { position: relative; z-index: 31; pointer-events: none; display: inline-block; line-height:1; }
 
-  /* idle wiggle */
   @keyframes pawnIdleSquashWiggle {
     0%   { transform: translateZ(0) translateX(0) rotate(0deg) scaleX(1)   scaleY(1); }
     12%  { transform: translateZ(0) translateX(-1px) rotate(-1.2deg) scaleX(1.03) scaleY(0.97); }
@@ -101,7 +75,6 @@
   }
   .pawn.idle { animation: pawnIdleSquashWiggle 2400ms cubic-bezier(.2,.7,.2,1) infinite; will-change: transform; }
 
-  /* EXTREME VISIBILITY pawn highlight (fits inside tile) */
   .pawn::before{
     content: "";
     position: absolute;
@@ -111,7 +84,7 @@
     width: calc(52px * var(--scale));
     height: calc(52px * var(--scale));
     border-radius: 50%;
-    z-index: 10; /* behind emoji but above effects */
+    z-index: 10; 
     opacity: 1;
     transition: opacity 100ms linear, transform 120ms ease, box-shadow 120ms ease;
     pointer-events: none;
@@ -131,7 +104,7 @@
     width: calc(72px * var(--scale));
     height: calc(72px * var(--scale));
     border-radius:50%;
-    z-index: 8; /* glow behind highlight and emoji */
+    z-index: 8;
     opacity: 0.85;
     pointer-events:none;
     filter: blur(calc(6px * var(--scale))) saturate(1.25);
@@ -141,40 +114,11 @@
     animation: pawnGlowBreath 1600ms ease-in-out infinite;
   }
 
-  /* color variants (saturated) */
-  .pawn[data-color="red"]::before{
-    background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(255,110,110,0.98) 36%, rgba(255,60,60,0.90) 62%, rgba(220,40,40,0.75) 78%, rgba(180,30,30,0.20) 92%);
-  }
+  .pawn[data-color="red"]::before{ background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(255,110,110,0.98) 36%, rgba(255,60,60,0.90) 62%, rgba(220,40,40,0.75) 78%, rgba(180,30,30,0.20) 92%); }
   .pawn[data-color="red"]::after{ background: radial-gradient(circle, rgba(255,90,90,0.92), transparent 42%); }
-
-  .pawn[data-color="blue"]::before{
-    background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(140,200,255,0.98) 36%, rgba(80,150,255,0.90) 62%, rgba(40,120,255,0.75) 78%, rgba(20,90,200,0.20) 92%);
-  }
+  .pawn[data-color="blue"]::before{ background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(140,200,255,0.98) 36%, rgba(80,150,255,0.90) 62%, rgba(40,120,255,0.75) 78%, rgba(20,90,200,0.20) 92%); }
   .pawn[data-color="blue"]::after{ background: radial-gradient(circle, rgba(100,170,255,0.92), transparent 42%); }
 
-  /* hover/drag intensify */
-  .pawn:hover::before, .pawn.dragging::before{
-    transform: translate(-50%,-50%) scale(1.08);
-    opacity: 1;
-    box-shadow: 0 0 calc(14px * var(--scale)) rgba(255,255,255,0.18);
-  }
-  .pawn:hover::after, .pawn.dragging::after{
-    transform: translate(-50%,-50%) scale(1.08);
-    opacity: 1;
-  }
-
-  @keyframes pawnHighlightPulse{
-    0%   { filter: saturate(1.25) contrast(1.2) drop-shadow(0 0 0 rgba(0,0,0,0)); }
-    50%  { filter: saturate(1.35) contrast(1.28) drop-shadow(0 0 calc(8px * var(--scale)) rgba(255,255,255,0.18)); }
-    100% { filter: saturate(1.25) contrast(1.2) drop-shadow(0 0 0 rgba(0,0,0,0)); }
-  }
-  @keyframes pawnGlowBreath{
-    0%   { opacity: 0.72; transform: translate(-50%,-50%) scale(0.98); }
-    50%  { opacity: 0.95; transform: translate(-50%,-50%) scale(1.06); }
-    100% { opacity: 0.72; transform: translate(-50%,-50%) scale(0.98); }
-  }
-
-  /* explosion and particle internals rely on these classes — keep them visible */
   .explosion { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: calc(260px * var(--scale)); height: calc(260px * var(--scale)); z-index: 18; }
   .explosion .ring { position: absolute; left:50%; top:50%; width:calc(40px * var(--scale)); height:calc(40px * var(--scale)); border-radius:50%; transform:translate(-50%,-50%) scale(0.3); border:calc(7px * var(--scale)) solid rgba(255,230,150,0.98); animation: ringPop 560ms cubic-bezier(.1,.9,.2,1) forwards; }
   @keyframes ringPop { to { transform: translate(-50%,-50%) scale(6.0); opacity: 0; } }
@@ -185,21 +129,12 @@
   .explosion .particle { position:absolute; left:50%; top:50%; width:calc(14px * var(--scale)); height:calc(14px * var(--scale)); border-radius:50%; opacity:1; transform-origin:center; animation: particleFly 760ms cubic-bezier(.12,.85,.28,1) forwards; box-shadow:0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32); background: radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b; }
   @keyframes particleFly { to { transform: translate(var(--tx), var(--ty)) scale(0.36); opacity: 0; filter: blur(0.8px); } }
 
-  /* captured tiles */
-  .captured-red{ background:#ff6b6b; box-shadow: 0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02); outline: calc(3px * var(--scale)) solid rgba(255,120,120,0.24); }
-  .captured-blue{ background:#6bb2ff; box-shadow: 0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02); outline: calc(3px * var(--scale)) solid rgba(120,180,255,0.24); }
-  .pawn img, .pawn svg { width: 100%; height: 100%; object-fit:contain; }
-
   #status{min-height:20px;font-size:calc(14px * var(--scale));text-align:center}
   .small{font-size:calc(12px * var(--scale));opacity:0.9;text-align:center}
 
   .flower-field { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
   .flower { position: absolute; opacity: var(--opa,0.22); transform-origin: center; will-change: transform, opacity; animation: flowerFloat var(--dur) linear infinite; user-select: none; font-family: serif; }
-  @keyframes flowerFloat {
-    0% { transform: translateY(0) rotate(0deg) scale(var(--scaleF,1)); opacity: var(--opa,0.22); }
-    50% { transform: translateY(-8px) rotate(var(--rot,0deg)) scale(calc(var(--scaleF,1) * 1.03)); opacity: calc(var(--opa,0.22) + 0.06); }
-    100% { transform: translateY(0) rotate(calc(var(--rot,0deg) * -1)) scale(var(--scaleF,1)); opacity: var(--opa,0.22); }
-  }
+  @keyframes flowerFloat { 0% { transform: translateY(0) rotate(0deg) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } 50% { transform: translateY(-8px) rotate(var(--rot,0deg)) scale(calc(var(--scaleF,1) * 1.03)); opacity: calc(var(--opa,0.22) + 0.06); } 100% { transform: translateY(0) rotate(calc(var(--rot,0deg) * -1)) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } }
 
   @media (max-width:520px){
     :root{--scale:1; --tile:48px}
@@ -238,7 +173,7 @@
   </div>
 
 <script>
-/* Project Elmo 004.7 — swipe-to-move added; retains prior features */
+/* Project Elmo 004.7 — full script with swipe, chain rules, double-step first move */
 
 // DOM refs
 const board = document.getElementById('board');
@@ -261,33 +196,19 @@ const undoStack = [];
 const redoStack = [];
 let suppressSnapshots = false;
 
-// detect reduced motion preference
 const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-// helper: enable idle animation after element is inserted and a frame has passed
-function enableIdleAfterFrame(el){
-  if(prefersReducedMotion) return;
-  el.style.transform = '';
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    if(document.contains(el)) el.classList.add('idle');
-  }));
-}
-
-// clamp helper (keeps values inside bounds)
+function enableIdleAfterFrame(el){ if(prefersReducedMotion) return; el.style.transform = ''; requestAnimationFrame(()=> requestAnimationFrame(()=> { if(document.contains(el)) el.classList.add('idle'); })); }
 function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
-
-// small helpers
 function isDiagonal(dx, dy){ return dx === 1 && dy === 1; }
 
-// --- Swipe config and helpers ---
-const SWIPE_MIN_DIST = 24;        // px — minimum distance to consider a swipe
-const SWIPE_MAX_TIME = 450;      // ms — max time for a swipe
-const SWIPE_ANGLE_TOL = 45;      // degrees tolerance when mapping to 8 directions
-
+// Swipe helpers
+const SWIPE_MIN_DIST = 24;
+const SWIPE_MAX_TIME = 450;
+const SWIPE_ANGLE_TOL = 45;
 function angleDeg(dx, dy){ return Math.atan2(dy, dx) * 180 / Math.PI; }
-
 function angleToCellDelta(dxPx, dyPx){
-  const angle = angleDeg(dxPx, dyPx); // -180..180
+  const angle = angleDeg(dxPx, dyPx);
   const dirs = [
     {ang: -135, d:[-1,-1]}, {ang: -90, d:[0,-1]}, {ang: -45, d:[1,-1]},
     {ang: 180, d:[-1,0]},                   {ang: 0, d:[1,0]},
@@ -302,65 +223,12 @@ function angleToCellDelta(dxPx, dyPx){
   return { dx: best.d[0], dy: best.d[1] };
 }
 
-// Web Audio: context + melodic capture
+// Audio & effects (unchanged)
 let audioCtx = null;
 function ensureAudioContext(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
-function playCaptureMelody(level = 1, dest = null){
-  try {
-    ensureAudioContext();
-    if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{});
-    const now = audioCtx.currentTime;
-    const out = dest || audioCtx.destination;
-    const baseFreq = 440;
-    const seq = [0, 3, 7, 12];
-    const tempo = 0.12;
-    const gainMaster = audioCtx.createGain(); gainMaster.gain.value = 0.12 * Math.min(1.6, 0.6 + 0.12 * level); gainMaster.connect(out);
-    seq.forEach((semi, i) => {
-      const t = now + i * tempo * (0.95 + Math.random() * 0.06);
-      const freq = baseFreq * Math.pow(2, (semi + (level-1)*1.2) / 12);
-      const osc = audioCtx.createOscillator();
-      const osc2 = audioCtx.createOscillator();
-      const g = audioCtx.createGain();
-      const filt = audioCtx.createBiquadFilter();
-      osc.type = 'sine';
-      osc2.type = 'triangle';
-      osc.frequency.setValueAtTime(freq * (0.98 + Math.random() * 0.02), t);
-      osc2.frequency.setValueAtTime(freq * 1.98, t);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.linearRampToValueAtTime(1.0 * (0.12 + level * 0.02), t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + tempo * 0.92);
-      filt.type = 'highpass';
-      filt.frequency.value = 120 + level * 10;
-      osc.connect(filt);
-      osc2.connect(filt);
-      filt.connect(g);
-      g.connect(gainMaster);
-      osc.start(t);
-      osc.stop(t + tempo * 0.95);
-      osc2.start(t);
-      osc2.stop(t + tempo * 0.95);
-    });
-  } catch (e) { console.warn('Audio error', e); }
-}
+function playCaptureMelody(level = 1, dest = null){ try { ensureAudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{}); const now = audioCtx.currentTime; const out = dest || audioCtx.destination; const baseFreq = 440; const seq = [0, 3, 7, 12]; const tempo = 0.12; const gainMaster = audioCtx.createGain(); gainMaster.gain.value = 0.12 * Math.min(1.6, 0.6 + 0.12 * level); gainMaster.connect(out); seq.forEach((semi, i) => { const t = now + i * tempo * (0.95 + Math.random() * 0.06); const freq = baseFreq * Math.pow(2, (semi + (level-1)*1.2) / 12); const osc = audioCtx.createOscillator(); const osc2 = audioCtx.createOscillator(); const g = audioCtx.createGain(); const filt = audioCtx.createBiquadFilter(); osc.type = 'sine'; osc2.type = 'triangle'; osc.frequency.setValueAtTime(freq * (0.98 + Math.random() * 0.02), t); osc2.frequency.setValueAtTime(freq * 1.98, t); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(1.0 * (0.12 + level * 0.02), t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + tempo * 0.92); filt.type = 'highpass'; filt.frequency.value = 120 + level * 10; osc.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(gainMaster); osc.start(t); osc.stop(t + tempo * 0.95); osc2.start(t); osc2.stop(t + tempo * 0.95); }); } catch (e) { console.warn('Audio error', e); } }
+function playPlacementSound(){ try{ ensureAudioContext(); const now = audioCtx.currentTime; const gain = audioCtx.createGain(); gain.gain.value = 0.08; gain.connect(audioCtx.destination); const osc = audioCtx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(660, now); osc.frequency.exponentialRampToValueAtTime(880, now + 0.09); const env = audioCtx.createGain(); env.gain.setValueAtTime(0.0001, now); env.gain.linearRampToValueAtTime(1.0, now + 0.008); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.16); osc.connect(env); env.connect(gain); osc.start(now); osc.stop(now + 0.18); }catch(e){} }
 
-// Placement sound (short click)
-function playPlacementSound(){
-  try{
-    ensureAudioContext();
-    const now = audioCtx.currentTime;
-    const gain = audioCtx.createGain(); gain.gain.value = 0.08; gain.connect(audioCtx.destination);
-    const osc = audioCtx.createOscillator(); osc.type = 'sine';
-    osc.frequency.setValueAtTime(660, now);
-    osc.frequency.exponentialRampToValueAtTime(880, now + 0.09);
-    const env = audioCtx.createGain(); env.gain.setValueAtTime(0.0001, now);
-    env.gain.linearRampToValueAtTime(1.0, now + 0.008);
-    env.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
-    osc.connect(env); env.connect(gain);
-    osc.start(now); osc.stop(now + 0.18);
-  }catch(e){ /* silent fail */ }
-}
-
-// Visual placement effect: cell pulse + tiny pop (clamped inside boardWrap)
 function showPlacementEffect(cellElem){
   if(!cellElem) return;
   cellElem.style.transition = 'transform 140ms ease, box-shadow 140ms ease';
@@ -399,7 +267,6 @@ function showPlacementEffect(cellElem){
   setTimeout(()=> pop.remove(), 420);
 }
 
-// Explosion creator (clamped to boardWrap center)
 function showExplosionAtCell(cellElem, color = 'orange') {
   if (!cellElem || !boardWrap) return;
   const cellRect = cellElem.getBoundingClientRect();
@@ -455,11 +322,10 @@ function showExplosionAtCell(cellElem, color = 'orange') {
   setTimeout(() => expl.remove(), 1000);
 }
 
-// Flower initializer
+// Flowers
 function initFlowers(){
   const field = document.getElementById('flowerField');
   if(!field) return;
-  field.style.willChange = 'transform,opacity';
   field.innerHTML = '';
   const emojis = ['🌸','🌼','🌺','🌻','🌷'];
   const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
@@ -489,7 +355,7 @@ function initFlowers(){
   });
 }
 
-// Snapshot helpers
+// Snapshots
 function takeSnapshot(){
   const boardArr = new Array(25).fill(null);
   for(let i=0;i<25;i++){
@@ -497,7 +363,7 @@ function takeSnapshot(){
     if(!cell) continue;
     const pawnEl = cell.querySelector('.pawn');
     if(pawnEl){
-      boardArr[i] = { pawn: pawnEl.dataset.color, captured: cell.classList.contains('captured-red') || cell.classList.contains('captured-blue') };
+      boardArr[i] = { pawn: pawnEl.dataset.color, moved: pawnEl.dataset.moved === 'true', captured: cell.classList.contains('captured-red') || cell.classList.contains('captured-blue') };
     } else if (cell.classList.contains('captured-red')){
       boardArr[i] = { pawn:'red', captured:true };
     } else if (cell.classList.contains('captured-blue')){
@@ -517,7 +383,6 @@ function takeSnapshot(){
   };
 }
 
-// applySnapshot restores state without producing new snapshots; preserves currentPlayer
 function applySnapshot(snapshot){
   if(!snapshot || !Array.isArray(snapshot.board)) return;
   suppressSnapshots = true;
@@ -537,6 +402,7 @@ function applySnapshot(snapshot){
       if(entry && entry.pawn){
         if(entry.captured) cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
         const pawn = makePawn(entry.pawn);
+        if(entry.moved) pawn.dataset.moved = 'true'; else pawn.dataset.moved = 'false';
         cell.appendChild(pawn);
         pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
       }
@@ -559,7 +425,6 @@ function applySnapshot(snapshot){
   updateUndoRedoButtons();
 }
 
-// recordSnapshot accepts option to mark whether this snapshot counts as a player move
 function recordSnapshot(opts = { countAsMove: true }){
   if(suppressSnapshots) return;
   const { countAsMove } = opts;
@@ -568,31 +433,11 @@ function recordSnapshot(opts = { countAsMove: true }){
   if(countAsMove) redoStack.length = 0;
   updateUndoRedoButtons();
 }
+function updateUndoRedoButtons(){ undoBtn.disabled = undoStack.length <= 1; redoBtn.disabled = redoStack.length === 0; }
+function undo(){ if(undoStack.length <= 1) return; const cur = undoStack.pop(); redoStack.push(cur); const prev = undoStack[undoStack.length - 1]; if(prev) applySnapshot(prev); updateStatus('Undid action'); }
+function redo(){ if(redoStack.length === 0) return; const snap = redoStack.pop(); applySnapshot(snap); undoStack.push(snap); updateStatus('Redid action'); }
 
-function updateUndoRedoButtons(){
-  undoBtn.disabled = undoStack.length <= 1;
-  redoBtn.disabled = redoStack.length === 0;
-}
-
-// undo / redo preserve currentPlayer
-function undo(){
-  if(undoStack.length <= 1) return;
-  const cur = undoStack.pop();
-  redoStack.push(cur);
-  const prev = undoStack[undoStack.length - 1];
-  if(prev) applySnapshot(prev);
-  updateStatus('Undid action');
-}
-
-function redo(){
-  if(redoStack.length === 0) return;
-  const snap = redoStack.pop();
-  applySnapshot(snap);
-  undoStack.push(snap);
-  updateStatus('Redid action');
-}
-
-// board init and interaction
+// Board init
 function resetBoard(){
   board.innerHTML = '';
   scores = { red:0, blue:0 };
@@ -609,14 +454,16 @@ function resetBoard(){
     board.appendChild(cell);
   }
 
-  // place starting pawns: blue on first row (0-4), red on last row (20-24)
+  // starting pawns: blue row 0..4, red row 20..24
   for(let i=0;i<5;i++){
     const bluePawn = makePawn('blue');
+    bluePawn.dataset.moved = 'false';
     board.children[i].appendChild(bluePawn);
     bluePawn.__enableIdleAfterAppend && bluePawn.__enableIdleAfterAppend();
   }
   for(let i=20;i<25;i++){
     const redPawn = makePawn('red');
+    redPawn.dataset.moved = 'false';
     board.children[i].appendChild(redPawn);
     redPawn.__enableIdleAfterAppend && redPawn.__enableIdleAfterAppend();
   }
@@ -626,7 +473,6 @@ function resetBoard(){
   updateUndoRedoButtons();
   updateStatus();
 
-  // ensure flowers are present after reset
   if (typeof initFlowers === 'function') initFlowers();
 }
 
@@ -640,19 +486,18 @@ function onCellClick(cell){
     return;
   }
 
-  // If chain is active, block diagonal placement that would not be a capture
   if(chainMode && chainPawn){
     const fromIdx = Number(chainPawn.parentElement.dataset.index);
     const toIdx = idx;
     const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
     const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
     if(isDiagonal(dx,dy)){
-      // diagonal placements must be captures; since cell is empty we block
       return;
     }
   }
 
   const pawn = makePawn(currentPlayer);
+  pawn.dataset.moved = 'true'; // placement from home row counts as having moved
   cell.appendChild(pawn);
   pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
   playPlacementSound();
@@ -661,19 +506,35 @@ function onCellClick(cell){
   if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
 }
 
-function countPawns(color){
-  let count = 0;
-  for(let i=0;i<board.children.length;i++){
-    const cell = board.children[i];
-    if(!cell) continue;
-    const p = cell.querySelector('.pawn');
-    if(p && p.dataset.color === color) count++;
-  }
-  return count;
-}
+function countPawns(color){ let count = 0; for(let i=0;i<board.children.length;i++){ const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(p && p.dataset.color === color) count++; } return count; }
 
 function isValidMove(dx,dy){ return dx <= 1 && dy <= 1 && (dx + dy > 0); }
 function isValidCapture(dx,dy){ return dx === 1 && dy === 1; }
+
+// New helper: canDoubleStep for first move (non-capturing, straight)
+function canDoubleStep(pawn, fromIdx, toIdx){
+  if(!pawn) return false;
+  if(pawn.dataset.moved === 'true') return false;
+  const dx = (toIdx % 5) - (fromIdx % 5);
+  const dy = Math.floor(toIdx / 5) - Math.floor(fromIdx / 5);
+  if(dx !== 0) return false;
+  if(Math.abs(dy) !== 2) return false;
+  // ensure direction is forward for the pawn
+  if(pawn.dataset.color === 'red' && dy > 0) return false; // red starts bottom, forward is up (negative) — adapt depending on your board orientation
+  if(pawn.dataset.color === 'blue' && dy < 0) return false;
+  // check intermediate cell empty
+  const midY = Math.floor((Math.floor(fromIdx / 5) + Math.floor(toIdx / 5)) / 2);
+  const midX = fromIdx % 5;
+  const midIdx = midY * 5 + midX;
+  const midCell = board.children[midIdx];
+  if(!midCell) return false;
+  if(midCell.querySelector('.pawn')) return false;
+  // destination must be empty (non-capturing)
+  const destCell = board.children[toIdx];
+  if(!destCell) return false;
+  if(destCell.querySelector('.pawn')) return false;
+  return true;
+}
 
 function availableDiagonalCapturesFromCell(cellElem){
   if(!cellElem) return [];
@@ -691,7 +552,7 @@ function availableDiagonalCapturesFromCell(cellElem){
   return out;
 }
 
-// handleDrop enforces: during chain, diagonal moves without an opponent pawn are blocked
+// handleDrop: updated to allow double-step on first move
 function handleDrop(e, targetCell){
   e.preventDefault && e.preventDefault();
   if(!dragged) return;
@@ -701,18 +562,19 @@ function handleDrop(e, targetCell){
   const fromIdx = Number(fromCell.dataset.index), toIdx = Number(targetCell.dataset.index);
   const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
   const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
-  if(!isValidMove(dx,dy)) return;
+  // allow normal king-step moves or first-move double-step
+  if(!(isValidMove(dx,dy) || canDoubleStep(pawn, fromIdx, toIdx))) return;
 
   const existing = targetCell.querySelector('.pawn');
 
   // If a chain is active, disallow diagonal moves that are not captures
   if(chainMode && chainPawn){
     if(isDiagonal(dx,dy) && !(existing && existing.dataset.color !== pawn.dataset.color)){
-      // invalid chain move: diagonal but no opponent pawn to capture
       return;
     }
   }
 
+  // Capture branch (diagonal capture)
   if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy)){
     existing.classList.add('captured');
     showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
@@ -724,6 +586,8 @@ function handleDrop(e, targetCell){
       targetCell.appendChild(pawn);
       pawn.classList.remove('dragging');
       pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+      // mark moved
+      pawn.dataset.moved = 'true';
       scores[currentPlayer]++; chainCount++;
       showCaptureEffect(targetCell, pawn.dataset.color);
       const further = availableDiagonalCapturesFromCell(targetCell);
@@ -745,10 +609,14 @@ function handleDrop(e, targetCell){
     return;
   }
 
+  // Non-capture branch — includes single-step moves and double-step first move
   if(existing) return;
+  // perform move
   targetCell.appendChild(pawn);
   pawn.classList.remove('dragging');
   pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+  // mark moved if it was a single-step or a double-step (double-step check handled above)
+  pawn.dataset.moved = 'true';
   playPlacementSound();
   showPlacementEffect(targetCell);
   recordSnapshot({ countAsMove: true });
@@ -757,70 +625,27 @@ function handleDrop(e, targetCell){
 
 function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; }
 
-function showCaptureEffect(cell,color){
-  cell.style.transition = 'transform .18s ease, box-shadow .18s ease';
-  cell.style.transform = 'scale(1.04)';
-  setTimeout(()=>{ cell.style.transform = ''; }, 160);
-}
-
-function capturedOwnerOf(index){
-  const cell = board.children[index];
-  if(!cell) return null;
-  if(cell.classList.contains('captured-red')) return 'red';
-  if(cell.classList.contains('captured-blue')) return 'blue';
-  return null;
-}
+function showCaptureEffect(cell,color){ cell.style.transition = 'transform .18s ease, box-shadow .18s ease'; cell.style.transform = 'scale(1.04)'; setTimeout(()=>{ cell.style.transform = ''; }, 160); }
+function capturedOwnerOf(index){ const cell = board.children[index]; if(!cell) return null; if(cell.classList.contains('captured-red')) return 'red'; if(cell.classList.contains('captured-blue')) return 'blue'; return null; }
 
 function checkCapturedRunOfThreeForColor(color){
-  for(let r=0;r<5;r++){
-    for(let c=0;c<=2;c++){
-      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf(r*5 + c+1) === color && capturedOwnerOf(r*5 + c+2) === color) return true;
-    }
-  }
-  for(let c=0;c<5;c++){
-    for(let r=0;r<=2;r++){
-      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c) === color && capturedOwnerOf((r+2)*5 + c) === color) return true;
-    }
-  }
-  for(let r=0;r<=2;r++){
-    for(let c=0;c<=2;c++){
-      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c+1) === color && capturedOwnerOf((r+2)*5 + c+2) === color) return true;
-    }
-  }
-  for(let r=2;r<5;r++){
-    for(let c=0;c<=2;c++){
-      if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r-1)*5 + c+1) === color && capturedOwnerOf((r-2)*5 + c+2) === color) return true;
-    }
-  }
+  for(let r=0;r<5;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf(r*5 + c+1) === color && capturedOwnerOf(r*5 + c+2) === color) return true; } }
+  for(let c=0;c<5;c++){ for(let r=0;r<=2;r++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c) === color && capturedOwnerOf((r+2)*5 + c) === color) return true; } }
+  for(let r=0;r<=2;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c+1) === color && capturedOwnerOf((r+2)*5 + c+2) === color) return true; } }
+  for(let r=2;r<5;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r-1)*5 + c+1) === color && capturedOwnerOf((r-2)*5 + c+2) === color) return true; } }
   return false;
 }
 
-function checkWinCapturedThreeInRow(playerColor){
-  if(checkCapturedRunOfThreeForColor(playerColor)){
-    endGame(playerColor);
-    return true;
-  }
-  return false;
-}
+function checkWinCapturedThreeInRow(playerColor){ if(checkCapturedRunOfThreeForColor(playerColor)){ endGame(playerColor); return true; } return false; }
+function endGame(playerColor){ updateStatus(`🏆 ${playerColor === 'red' ? '🐲' : '🦄'} wins — three captured tiles in a row!`); board.querySelectorAll('.cell').forEach(cell => { cell.replaceWith(cell.cloneNode(true)); }); }
 
-function endGame(playerColor){
-  updateStatus(`🏆 ${playerColor === 'red' ? '🐲' : '🦄'} wins — three captured tiles in a row!`);
-  board.querySelectorAll('.cell').forEach(cell => {
-    cell.replaceWith(cell.cloneNode(true));
-  });
-}
-
-function updateStatus(msg=''){
-  if(msg){ status.textContent = msg; return; }
-  status.textContent = `Turn: ${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} | Score 🐲: ${scores.red} ⬄ 🦄: ${scores.blue}` + (chainMode ? ' — chain active' : '');
-}
+function updateStatus(msg=''){ if(msg){ status.textContent = msg; return; } status.textContent = `Turn: ${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} | Score 🐲: ${scores.red} ⬄ 🦄: ${scores.blue}` + (chainMode ? ' — chain active' : ''); }
 
 function makePawn(color){
   const pawn = document.createElement('div');
   pawn.className = 'pawn';
   pawn.draggable = true;
   pawn.dataset.color = color;
-  // face span ensures emoji sits above pseudo-elements
   const face = document.createElement('span');
   face.className = 'pface';
   face.textContent = color === 'red' ? '🐲' : '🦄';
@@ -829,7 +654,6 @@ function makePawn(color){
   function pauseIdle(){ pawn.classList.remove('idle'); }
   function resumeIdle(){ if(prefersReducedMotion) return; setTimeout(()=> { if(!pawn.classList.contains('dragging') && document.contains(pawn)) pawn.classList.add('idle'); }, 60); }
 
-  // --- swipe/touch tracking variables ---
   let swipeStart = null;
   let swipeTimer = null;
 
@@ -865,7 +689,6 @@ function makePawn(color){
     }
     if (pawn.dataset.color !== currentPlayer) { resumeIdle(); return; }
 
-    // capture initial swipe state for touch/pen/mouse
     try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
     dragged = pawn;
     pawn.classList.add('dragging');
@@ -878,14 +701,10 @@ function makePawn(color){
   pawn.addEventListener('pointermove', (ev) => {
     if(!swipeStart) return;
     if(swipeStart.pointerId != null && ev.pointerId !== swipeStart.pointerId) return;
-    // optional: light visual feedback while swiping (disabled for now)
-    // const dx = ev.clientX - swipeStart.x, dy = ev.clientY - swipeStart.y;
-    // pawn.style.transform = `translate(${dx*0.08}px, ${dy*0.08}px)`;
   });
 
   pawn.addEventListener('pointerup', (ev) => {
     try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
-    // Analyze swipe
     if(swipeStart && swipeStart.pointerId != null && ev.pointerId === swipeStart.pointerId){
       const dt = Date.now() - swipeStart.t;
       const dx = ev.clientX - swipeStart.x;
@@ -903,7 +722,6 @@ function makePawn(color){
               const toIdx = ty * 5 + tx;
               const targetCell = board.children[toIdx];
               if(targetCell){
-                // If chain active: block diagonal non-capture
                 const existing = targetCell.querySelector('.pawn');
                 if(chainMode && chainPawn && Math.abs(delta.dx) === 1 && Math.abs(delta.dy) === 1){
                   if(!(existing && existing.dataset.color !== pawn.dataset.color)){
@@ -913,11 +731,9 @@ function makePawn(color){
                     return;
                   }
                 }
-                // Validate as a normal move
                 const dxCells = Math.abs(tx - fx), dyCells = Math.abs(ty - fy);
-                if(isValidMove(dxCells, dyCells)){
-                  // Use existing flow by invoking handleDrop with a synthetic event (keeps snapshots/sounds/effects)
-                  try { handleDrop(new Event('swipe-drop'), targetCell); } catch(e){ /* ignore */ }
+                if(isValidMove(dxCells, dyCells) || canDoubleStep(pawn, fromIdx, toIdx)){
+                  try { handleDrop(new Event('swipe-drop'), targetCell); } catch(e){}
                 }
               }
             }
@@ -925,12 +741,10 @@ function makePawn(color){
         }
       }
     }
-
     swipeStart = null;
     clearTimeout(swipeTimer);
     setTimeout(()=> pawn.classList.remove('dragging'),40);
     resumeIdle();
-    // clear any transform
     pawn.style.transform = '';
   });
 
@@ -939,7 +753,7 @@ function makePawn(color){
   return pawn;
 }
 
-// initialization
+// Init
 function init(){
   board.innerHTML = '';
   for(let i=0;i<25;i++){
@@ -951,7 +765,6 @@ function init(){
     cell.addEventListener('drop', e=> handleDrop(e, cell));
     board.appendChild(cell);
   }
-
   resetBoard();
 }
 
@@ -960,8 +773,6 @@ undoBtn.addEventListener('click', () => undo());
 redoBtn.addEventListener('click', () => redo());
 
 init();
-
-// ensure flowers are created after UI build (also safe on load)
 if (typeof initFlowers === 'function') initFlowers();
 window.addEventListener('load', () => { if (typeof initFlowers === 'function') initFlowers(); });
 
