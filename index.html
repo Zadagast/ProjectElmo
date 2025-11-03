@@ -10,6 +10,17 @@
     --bg1:#0b6b2d;
     --bg2:#18a058;
     --tile:calc(60px * var(--scale));
+    /* Tile theming for embossed appearance */
+    --tile-border: rgba(0,0,0,0.14);
+    --tile-highlight: rgba(255,255,255,0.18);
+    --tile-white-top: linear-gradient(180deg,#ffffff 0%, #f1f1f1 40%, #e6e6e6 100%);
+    --tile-black-top: linear-gradient(180deg,#3a3a3a 0%, #2f2f2f 50%, #242424 100%);
+    /* Rim variables (green theme) */
+    --tile-gold-1: #bff0c8; /* light green highlight */
+    --tile-gold-2: #2e9a4a; /* deeper green */
+  --tile-gold-edge: var(--tile-gold-2);
+  --tile-gold-glow: rgba(46,154,74,0.12);
+    --tile-gold-width: 2.5px; /* rim width (px) */
   }
   html,body{height:100%;margin:0}
   body{
@@ -36,10 +47,90 @@
   button{padding:calc(8px * var(--scale)) calc(12px * var(--scale));border-radius:calc(8px * var(--scale));border:0;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;font-size:calc(13px * var(--scale))}
   button:disabled{opacity:.45;cursor:not-allowed}
 
-  #boardWrap{display:flex;justify-content:center;width:100%;position:relative;overflow:hidden}
+  /* Allow visual overflow for tile shadows, specular streaks and particle effects
+    so bottom tiles aren't clipped. Add a little bottom padding to provide breathing room. */
+  #boardWrap{display:flex;justify-content:center;width:100%;position:relative;overflow:visible;padding-bottom:calc(8px * var(--scale));}
   #board{display:grid;grid-template-columns:repeat(5,var(--tile));grid-gap:calc(6px * var(--scale));margin:0 auto;position:relative;z-index:3}
-  .cell{width:var(--tile);height:var(--tile);display:flex;align-items:center;justify-content:center;border-radius:calc(8px * var(--scale));cursor:pointer}
-  .white{background:#fff;color:#111}.black{background:#333;color:#fff}
+  .cell{
+    width:var(--tile);
+    height:var(--tile);
+    display:flex;align-items:center;justify-content:center;
+    border-radius:calc(8px * var(--scale));
+    cursor:pointer;
+    /* subtle outer edge and inner bevel for embossed look */
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.12),
+                inset 0 calc(-6px * var(--scale)) calc(12px * var(--scale)) rgba(255,255,255,0.02),
+                /* subtle gold rim (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+    transition: transform 120ms ease, box-shadow 160ms ease;
+    position:relative; overflow:visible;
+  }
+
+  .white{
+    background: var(--tile-white-top);
+    color:#111;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.08),
+                inset 0 6px 12px rgba(255,255,255,0.7),
+                inset 0 -6px 10px rgba(0,0,0,0.04),
+                /* green edge (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+  }
+
+  .black{
+    background: var(--tile-black-top);
+    color:#fff;
+    border: 1px solid rgba(255,255,255,0.03);
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.18),
+                inset 0 6px 10px rgba(255,255,255,0.04),
+                inset 0 -6px 12px rgba(0,0,0,0.45),
+                /* green edge (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+  }
+
+  /* Hover/active states to emphasize shiny rim (green theme) */
+  .cell:hover{
+    /* do not change tile position on hover; only accentuate the rim */
+    box-shadow: 0 calc(10px * var(--scale)) calc(28px * var(--scale)) rgba(0,0,0,0.18),
+                inset 0 calc(-6px * var(--scale)) calc(12px * var(--scale)) rgba(255,255,255,0.02),
+                0 0 0 calc(var(--tile-gold-width) * 1.6) var(--tile-gold-edge), /* stronger opaque rim */
+                0 10px 36px var(--tile-gold-glow);
+  }
+
+  .cell:active{
+    /* keep tile position stable on active press; boost rim */
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.14),
+                inset 0 2px 8px rgba(0,0,0,0.06),
+                0 0 0 calc(var(--tile-gold-width) * 1.2) var(--tile-gold-edge);
+  }
+
+  /* Metallic specular streak: narrow blurred highlight that follows the tile curvature
+     - Uses ::after so it doesn't affect layout
+     - Intensifies on hover without moving the tile
+  */
+  .cell::after{
+    content: "";
+    position: absolute;
+    left: -10%;
+    top: 12%;
+    width: 120%;
+    height: 26%;
+    pointer-events: none;
+    border-radius: calc(6px * var(--scale));
+    transform: rotate(-18deg) scaleX(0.95);
+    background: linear-gradient(90deg, rgba(255,255,255,0.00) 0%, rgba(255,255,255,0.92) 42%, rgba(255,255,255,0.18) 58%, rgba(255,255,255,0.00) 100%);
+    filter: blur(calc(6px * var(--scale)));
+    opacity: 0.14;
+    mix-blend-mode: screen;
+    transition: opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+    z-index: 12; /* below pawns (pawn z-index:30) but above tile base */
+  }
+
+  /* increase streak brightness on hover (tile does not move) */
+  .cell:hover::after{
+    opacity: 0.34;
+    transform: rotate(-18deg) scaleX(1.02);
+  }
   .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
 
   .pawn{
@@ -420,6 +511,7 @@ function applySnapshot(snapshot){
     suppressSnapshots = false;
   }
 
+  // preserve the current player's turn when undo/redo is performed
   currentPlayer = preservedPlayer;
   updateStatus();
   updateUndoRedoButtons();
