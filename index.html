@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 004.7 — Chain capture restriction</title>
+<title>Project Elmo 004.7 — Swipe controls</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -81,6 +81,7 @@
     transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
     transform-origin: center;
     z-index: 30; /* ensure pawn content sits above temporary effects */
+    touch-action: none; /* let pointer events drive swipe detection on touch */
   }
 
   /* face wrapper sits above pseudo-elements */
@@ -237,7 +238,7 @@
   </div>
 
 <script>
-/* Project Elmo 004.7 — chain capture diagonal restriction + full game script */
+/* Project Elmo 004.7 — swipe-to-move added; retains prior features */
 
 // DOM refs
 const board = document.getElementById('board');
@@ -277,6 +278,29 @@ function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
 
 // small helpers
 function isDiagonal(dx, dy){ return dx === 1 && dy === 1; }
+
+// --- Swipe config and helpers ---
+const SWIPE_MIN_DIST = 24;        // px — minimum distance to consider a swipe
+const SWIPE_MAX_TIME = 450;      // ms — max time for a swipe
+const SWIPE_ANGLE_TOL = 45;      // degrees tolerance when mapping to 8 directions
+
+function angleDeg(dx, dy){ return Math.atan2(dy, dx) * 180 / Math.PI; }
+
+function angleToCellDelta(dxPx, dyPx){
+  const angle = angleDeg(dxPx, dyPx); // -180..180
+  const dirs = [
+    {ang: -135, d:[-1,-1]}, {ang: -90, d:[0,-1]}, {ang: -45, d:[1,-1]},
+    {ang: 180, d:[-1,0]},                   {ang: 0, d:[1,0]},
+    {ang: 135, d:[-1,1]},  {ang: 90, d:[0,1]},  {ang: 45, d:[1,1]}
+  ];
+  let best = dirs[0], bestDiff = 360;
+  for(const cand of dirs){
+    let diff = Math.abs(((angle - cand.ang + 540) % 360) - 180);
+    if(diff < bestDiff){ bestDiff = diff; best = cand; }
+  }
+  if(bestDiff > SWIPE_ANGLE_TOL) return null;
+  return { dx: best.d[0], dy: best.d[1] };
+}
 
 // Web Audio: context + melodic capture
 let audioCtx = null;
@@ -346,11 +370,8 @@ function showPlacementEffect(cellElem){
   const wrap = boardWrap;
   const rect = cellElem.getBoundingClientRect();
   const wrapRect = wrap.getBoundingClientRect();
-  // compute center relative to wrap
   let px = rect.left + rect.width/2 - wrapRect.left;
   let py = rect.top + rect.height/2 - wrapRect.top;
-
-  // clamp so effect sits inside wrap (with small margin)
   const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
   const margin = Math.max(6, 6 * scale);
   px = clamp(px, margin, wrapRect.width - margin);
@@ -383,11 +404,8 @@ function showExplosionAtCell(cellElem, color = 'orange') {
   if (!cellElem || !boardWrap) return;
   const cellRect = cellElem.getBoundingClientRect();
   const wrapRect = boardWrap.getBoundingClientRect();
-  // center relative to wrap
   let cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
   let cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
-
-  // clamp to wrap bounds with margin
   const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
   const margin = Math.max(12, 12 * scale);
   cx = clamp(cx, margin, wrapRect.width - margin);
@@ -675,7 +693,7 @@ function availableDiagonalCapturesFromCell(cellElem){
 
 // handleDrop enforces: during chain, diagonal moves without an opponent pawn are blocked
 function handleDrop(e, targetCell){
-  e.preventDefault();
+  e.preventDefault && e.preventDefault();
   if(!dragged) return;
   const pawn = dragged;
   const fromCell = pawn.parentElement;
@@ -811,6 +829,10 @@ function makePawn(color){
   function pauseIdle(){ pawn.classList.remove('idle'); }
   function resumeIdle(){ if(prefersReducedMotion) return; setTimeout(()=> { if(!pawn.classList.contains('dragging') && document.contains(pawn)) pawn.classList.add('idle'); }, 60); }
 
+  // --- swipe/touch tracking variables ---
+  let swipeStart = null;
+  let swipeTimer = null;
+
   pawn.addEventListener('dragstart', (ev) => {
     pauseIdle();
     if(chainMode && chainPawn){
@@ -842,13 +864,74 @@ function makePawn(color){
       if (pawn !== chainPawn) { resumeIdle(); return; }
     }
     if (pawn.dataset.color !== currentPlayer) { resumeIdle(); return; }
+
+    // capture initial swipe state for touch/pen/mouse
     try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
-    dragged = pawn; pawn.classList.add('dragging');
+    dragged = pawn;
+    pawn.classList.add('dragging');
+
+    swipeStart = { x: ev.clientX, y: ev.clientY, t: Date.now(), pointerId: ev.pointerId };
+    clearTimeout(swipeTimer);
+    swipeTimer = setTimeout(()=> { swipeStart = null; }, SWIPE_MAX_TIME + 40);
   });
+
+  pawn.addEventListener('pointermove', (ev) => {
+    if(!swipeStart) return;
+    if(swipeStart.pointerId != null && ev.pointerId !== swipeStart.pointerId) return;
+    // optional: light visual feedback while swiping (disabled for now)
+    // const dx = ev.clientX - swipeStart.x, dy = ev.clientY - swipeStart.y;
+    // pawn.style.transform = `translate(${dx*0.08}px, ${dy*0.08}px)`;
+  });
+
   pawn.addEventListener('pointerup', (ev) => {
     try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
+    // Analyze swipe
+    if(swipeStart && swipeStart.pointerId != null && ev.pointerId === swipeStart.pointerId){
+      const dt = Date.now() - swipeStart.t;
+      const dx = ev.clientX - swipeStart.x;
+      const dy = ev.clientY - swipeStart.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist >= SWIPE_MIN_DIST && dt <= Math.max(SWIPE_MAX_TIME, dt)){
+        const delta = angleToCellDelta(dx, dy);
+        if(delta){
+          const fromCell = pawn.parentElement;
+          if(fromCell){
+            const fromIdx = Number(fromCell.dataset.index);
+            const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+            const tx = fx + delta.dx, ty = fy + delta.dy;
+            if(tx >= 0 && tx < 5 && ty >= 0 && ty < 5){
+              const toIdx = ty * 5 + tx;
+              const targetCell = board.children[toIdx];
+              if(targetCell){
+                // If chain active: block diagonal non-capture
+                const existing = targetCell.querySelector('.pawn');
+                if(chainMode && chainPawn && Math.abs(delta.dx) === 1 && Math.abs(delta.dy) === 1){
+                  if(!(existing && existing.dataset.color !== pawn.dataset.color)){
+                    swipeStart = null;
+                    setTimeout(()=> pawn.classList.remove('dragging'), 40);
+                    resumeIdle();
+                    return;
+                  }
+                }
+                // Validate as a normal move
+                const dxCells = Math.abs(tx - fx), dyCells = Math.abs(ty - fy);
+                if(isValidMove(dxCells, dyCells)){
+                  // Use existing flow by invoking handleDrop with a synthetic event (keeps snapshots/sounds/effects)
+                  try { handleDrop(new Event('swipe-drop'), targetCell); } catch(e){ /* ignore */ }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    swipeStart = null;
+    clearTimeout(swipeTimer);
     setTimeout(()=> pawn.classList.remove('dragging'),40);
     resumeIdle();
+    // clear any transform
+    pawn.style.transform = '';
   });
 
   pawn.__enableIdleAfterAppend = () => enableIdleAfterFrame(pawn);
