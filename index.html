@@ -713,7 +713,7 @@ function takeSnapshot(){
 function applySnapshot(snapshot){
   if(!snapshot || !Array.isArray(snapshot.board)) return;
   suppressSnapshots = true;
-  const preservedPlayer = currentPlayer;
+  // Always restore currentPlayer from snapshot
   try{
     for(let i=0;i<25;i++){
       const cell = board.children[i];
@@ -747,8 +747,7 @@ function applySnapshot(snapshot){
     suppressSnapshots = false;
   }
 
-  // preserve the current player's turn when undo/redo is performed
-  currentPlayer = preservedPlayer;
+  currentPlayer = snapshot.currentPlayer;
   updateStatus();
   updateUndoRedoButtons();
 }
@@ -762,8 +761,26 @@ function recordSnapshot(opts = { countAsMove: true }){
   updateUndoRedoButtons();
 }
 function updateUndoRedoButtons(){ undoBtn.disabled = undoStack.length <= 1; redoBtn.disabled = redoStack.length === 0; }
-function undo(){ if(undoStack.length <= 1) return; const cur = undoStack.pop(); redoStack.push(cur); const prev = undoStack[undoStack.length - 1]; if(prev) applySnapshot(prev); updateStatus('Undid action'); _postUndoRedo(); }
-function redo(){ if(redoStack.length === 0) return; const snap = redoStack.pop(); applySnapshot(snap); undoStack.push(snap); updateStatus('Redid action'); _postUndoRedo(); }
+function undo(){
+  if(undoStack.length <= 1) return;
+  // Remove the last move and restore the previous state
+  const last = undoStack.pop();
+  redoStack.push(last);
+  const prev = undoStack[undoStack.length - 1];
+  if(prev) {
+    applySnapshot(prev);
+    // Turn and chain attack state are restored from snapshot
+  }
+  updateStatus(); // Always show scoreboard
+}
+function redo(){
+  if(redoStack.length === 0) return;
+  const snap = redoStack.pop();
+  applySnapshot(snap);
+  undoStack.push(snap);
+  updateStatus(); // Always show scoreboard
+  _postUndoRedo();
+}
 // Ensure AI is scheduled if undo/redo left it as the active player
 function _postUndoRedo(){ scheduleAiIfNeeded(240); }
 
@@ -834,8 +851,12 @@ function onCellClick(cell){
   pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
   playPlacementSound();
   showPlacementEffect(cell);
-  recordSnapshot({ countAsMove: true });
-  if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+  if(!checkWinCapturedThreeInRow(currentPlayer)) {
+    switchTurn();
+    recordSnapshot({ countAsMove: true });
+  } else {
+    recordSnapshot({ countAsMove: true });
+  }
 }
 
 function countPawns(color){ let count = 0; for(let i=0;i<board.children.length;i++){ const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(p && p.dataset.color === color) count++; } return count; }
@@ -925,12 +946,12 @@ function handleDrop(e, targetCell){
       scores[currentPlayer]++; chainCount++;
       showCaptureEffect(targetCell, pawn.dataset.color);
       const further = availableDiagonalCapturesFromCell(targetCell);
-      recordSnapshot({ countAsMove: true });
       if(further.length > 0){
         chainMode = true;
         chainPawn = pawn;
         dragged = pawn;
-  updateStatus();
+        recordSnapshot({ countAsMove: true });
+        updateStatus();
         // If AI made this capture and it's the AI's pawn, schedule the next capture
         if(aiEnabled && pawn.dataset.color === aiColor){
           // wait slightly longer than the capture animation timeout before continuing
@@ -941,8 +962,12 @@ function handleDrop(e, targetCell){
         chainPawn = null;
         chainCount = 0;
         dragged = null;
-        if(checkWinCapturedThreeInRow(currentPlayer)) return;
+        if(checkWinCapturedThreeInRow(currentPlayer)) {
+          recordSnapshot({ countAsMove: true });
+          return;
+        }
         switchTurn();
+        recordSnapshot({ countAsMove: true });
         // schedule AI for next player (if applicable)
         scheduleAiIfNeeded();
       }
@@ -962,8 +987,12 @@ function handleDrop(e, targetCell){
   pawn.dataset.moved = 'true';
   playPlacementSound();
   showPlacementEffect(targetCell);
-  recordSnapshot({ countAsMove: true });
-  if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+  if(!checkWinCapturedThreeInRow(currentPlayer)) {
+    switchTurn();
+    recordSnapshot({ countAsMove: true });
+  } else {
+    recordSnapshot({ countAsMove: true });
+  }
 }
 
 function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; scheduleAiIfNeeded(); }
