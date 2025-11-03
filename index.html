@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 004.7 — Project Elmo</title>
+<title>Attack-Tac-Toe 004.7 — Attack-Tac-</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -288,11 +288,11 @@
 <body>
   <div class="flower-field" id="flowerField" aria-hidden="true"></div>
 
-  <div class="app" role="application" aria-label="Project Elmo">
+  <div class="app" role="application" aria-label="Attack-Tac-Toe">
     <div class="panel-backdrop">
       <header>
         <div class="titleRow">
-          <h1>Project Elmo</h1>
+          <h1>Attack-Tac-Toe</h1>
           <div class="vbadge">004.7</div>
         </div>
         <div id="status" class="small" aria-live="polite"></div>
@@ -303,6 +303,7 @@
         <button id="undoBtn" disabled>Undo</button>
         <button id="redoBtn" disabled>Redo</button>
         <button id="aiToggleBtn">Play vs AI</button>
+        <button id="rulesBtn">Rules</button>
       </div>
 
       <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
@@ -1217,6 +1218,48 @@ if(aiToggleBtn){
     aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'Play vs AI';
     // if turned on and it's AI's turn, schedule it
     if(aiEnabled) scheduleAiIfNeeded(320);
+  });
+}
+
+// Rules button — opens a small new window with concise, project-specific rules
+const rulesBtn = document.getElementById('rulesBtn');
+if(rulesBtn){
+  rulesBtn.addEventListener('click', ()=>{
+  const w = window.open('', 'project-elmo-rules', 'width=820,height=420,menubar=no,toolbar=no,location=no');
+    if(!w){ alert('Popup blocked. Allow pop-ups for this page to view rules.'); return; }
+    const doc = w.document;
+    const html = `<!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="utf-8">
+      <title>Tic-Tac-Attack — Rules</title>
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      <style>
+        body{font-family:system-ui,Segoe UI,Arial;line-height:1.4;padding:18px;color:#111;background:#fff}
+        h1{margin-top:0}
+        ol{margin-top:8px}
+        .hint{margin-top:12px;color:#444;font-size:0.92em}
+      </style>
+    </head>
+    <body>
+      <h1>Welcome to Tic-Tac-Attack! 👋</h1>
+      <p>A game that combines pawns from chess with tic-tac-toe! ♟️</p>
+      <hr>
+      <ol>
+        <li>1.) You are allowed one move per turn. ➡️</li>
+        <li>2.) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
+        <li>3.) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
+        <li>4.) Capturing a piece allows you to capture again if their is a target in sight. Causing a chain attack. ⚔️</li>
+        <li>5.) You can only have five pawns out at a time. 👁️</li>
+        <li>6.) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
+        <li>7.) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
+      </ol>
+  <hr>
+    </body>
+    </html>`;
+    doc.open(); doc.write(html); doc.close();
+    // focus the new window for convenience
+    try{ w.focus(); }catch(e){}
   });
 }
 
