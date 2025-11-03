@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Project Elmo 002.4 — Larger pieces with rings</title>
+<title>Project Elmo 003.2 — Larger pieces with rings</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -81,6 +81,24 @@
     transform-origin: center;
   }
 
+  /* idle squash-and-stretch + subtle wiggle for pawns */
+  @keyframes pawnIdleSquashWiggle {
+    0%   { transform: translateZ(0) translateX(0) rotate(0deg) scaleX(1)   scaleY(1); }
+    12%  { transform: translateZ(0) translateX(-1px) rotate(-1.2deg) scaleX(1.03) scaleY(0.97); }
+    25%  { transform: translateZ(0) translateX(1px)  rotate(1.1deg)  scaleX(1.04) scaleY(0.96); }
+    37%  { transform: translateZ(0) translateX(-0.6px) rotate(-0.6deg) scaleX(1.01) scaleY(0.99); }
+    50%  { transform: translateY(-3px) translateX(0) rotate(0deg)       scaleX(0.98) scaleY(1.04); }
+    62%  { transform: translateZ(0) translateX(0.6px) rotate(0.6deg)   scaleX(1.02) scaleY(0.98); }
+    75%  { transform: translateZ(0) translateX(-1px) rotate(-1deg)    scaleX(1.02) scaleY(0.98); }
+    88%  { transform: translateZ(0) translateX(0.4px) rotate(0.5deg)   scaleX(1.01) scaleY(0.99); }
+    100% { transform: translateZ(0) translateX(0) rotate(0deg)         scaleX(1)   scaleY(1); }
+  }
+
+  .pawn.idle {
+    animation: pawnIdleSquashWiggle 2400ms cubic-bezier(.2,.7,.2,1) infinite;
+    will-change: transform;
+  }
+
   /* colored ring drawn behind the pawn (matches pawn color) */
   .pawn::before{
     content: "";
@@ -143,6 +161,11 @@
     .panel-backdrop{padding:10px}
     button{padding:7px 10px}
   }
+
+  /* respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .pawn.idle { animation: none; transform: none; }
+  }
 </style>
 </head>
 <body>
@@ -153,7 +176,7 @@
       <header>
         <div class="titleRow">
           <h1>Project Elmo</h1>
-          <div class="vbadge">002.4</div>
+          <div class="vbadge">003.2</div>
         </div>
         <div id="status" class="small" aria-live="polite"></div>
       </header>
@@ -169,7 +192,7 @@
   </div>
 
 <script>
-/* Project Elmo 002.4 — Full client (larger pieces + colored rings) */
+/* Project Elmo 003.2 — Full client (larger pieces + colored rings + idle squash+wiggle) */
 
 // DOM refs
 const board = document.getElementById('board');
@@ -189,6 +212,19 @@ let scores = { red:0, blue:0 };
 const undoStack = [];
 const redoStack = [];
 let suppressSnapshots = false;
+
+// detect reduced motion preference
+const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// helper: enable idle animation after element is inserted and a frame has passed
+function enableIdleAfterFrame(el){
+  if(prefersReducedMotion) return;
+  // clear inline transform that could interfere
+  el.style.transform = '';
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if(document.contains(el)) el.classList.add('idle');
+  }));
+}
 
 // Web Audio: context + melodic capture
 let audioCtx = null;
@@ -331,12 +367,23 @@ function showPlacementEffect(cellElem){
 // Pawn factory with chain guard on dragstart/pointerdown
 function makePawn(color){
   const pawn = document.createElement('div');
-  pawn.className = 'pawn';
+  pawn.className = 'pawn'; // idle added after insertion
   pawn.textContent = color === 'red' ? '😈' : '😇';
   pawn.draggable = true;
   pawn.dataset.color = color;
 
+  function pauseIdle(){
+    pawn.classList.remove('idle');
+  }
+  function resumeIdle(){
+    if(prefersReducedMotion) return;
+    setTimeout(()=> {
+      if(!pawn.classList.contains('dragging') && document.contains(pawn)) pawn.classList.add('idle');
+    }, 60);
+  }
+
   pawn.addEventListener('dragstart', (ev) => {
+    pauseIdle();
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
       if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
@@ -349,15 +396,16 @@ function makePawn(color){
         ev.preventDefault();
         return;
       }
-      if (pawn !== chainPawn) { ev.preventDefault(); return; }
+      if (pawn !== chainPawn) { ev.preventDefault(); resumeIdle(); return; }
     }
-    if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); return; }
+    if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); resumeIdle(); return; }
     dragged = pawn; pawn.classList.add('dragging');
     try { ev.dataTransfer.setData('text/plain','drag'); } catch(e){}
   });
-  pawn.addEventListener('dragend', () => pawn.classList.remove('dragging'));
+  pawn.addEventListener('dragend', () => { pawn.classList.remove('dragging'); resumeIdle(); });
 
   pawn.addEventListener('pointerdown', (ev) => {
+    pauseIdle();
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
       if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
@@ -367,18 +415,23 @@ function makePawn(color){
         dragged = null;
         recordSnapshot({ countAsMove: true });
         if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
+        resumeIdle();
         return;
       }
-      if (pawn !== chainPawn) return;
+      if (pawn !== chainPawn) { resumeIdle(); return; }
     }
-    if (pawn.dataset.color !== currentPlayer) return;
+    if (pawn.dataset.color !== currentPlayer) { resumeIdle(); return; }
     try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
     dragged = pawn; pawn.classList.add('dragging');
   });
   pawn.addEventListener('pointerup', (ev) => {
     try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
     setTimeout(()=> pawn.classList.remove('dragging'),40);
+    resumeIdle();
   });
+
+  // helper so callers can enable idle after append
+  pawn.__enableIdleAfterAppend = () => enableIdleAfterFrame(pawn);
 
   return pawn;
 }
@@ -490,6 +543,8 @@ function applySnapshot(snapshot){
         if(entry.captured) cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
         const pawn = makePawn(entry.pawn);
         cell.appendChild(pawn);
+        // enable idle after appended
+        pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
       }
     }
     currentPlayer = snapshot.currentPlayer;
@@ -559,6 +614,8 @@ function onCellClick(cell){
   if(cell.querySelector('.pawn')) return;
   const pawn = makePawn(currentPlayer);
   cell.appendChild(pawn);
+  // enable idle after append
+  pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
 
   // placement feedback
   playPlacementSound();
@@ -616,6 +673,9 @@ function handleDrop(e, targetCell){
       targetCell.appendChild(pawn);
       pawn.classList.remove('dragging');
 
+      // ensure idle resumes when placed
+      pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+
       scores[currentPlayer]++; chainCount++;
 
       showCaptureEffect(targetCell, pawn.dataset.color);
@@ -645,6 +705,9 @@ function handleDrop(e, targetCell){
   if(existing) return;
   targetCell.appendChild(pawn);
   pawn.classList.remove('dragging');
+
+  // enable idle after append
+  pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
 
   // placement feedback for non-capture placement
   playPlacementSound();
