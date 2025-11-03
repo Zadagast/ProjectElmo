@@ -298,15 +298,14 @@
         <div id="status" class="small" aria-live="polite"></div>
       </header>
 
-      <div id="controls">
+      <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
+      <div id="controls" style="margin-top:24px;">
         <button id="resetBtn">Reset</button>
         <button id="undoBtn" disabled>Undo</button>
         <button id="redoBtn" disabled>Redo</button>
         <button id="aiToggleBtn">Play vs AI</button>
         <button id="rulesBtn">Rules</button>
       </div>
-
-      <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
     </div>
   </div>
   <div id="victoryOverlay" class="victory-overlay" aria-hidden="true">
@@ -931,7 +930,7 @@ function handleDrop(e, targetCell){
         chainMode = true;
         chainPawn = pawn;
         dragged = pawn;
-        updateStatus(`Chain x${chainCount}`);
+  updateStatus();
         // If AI made this capture and it's the AI's pawn, schedule the next capture
         if(aiEnabled && pawn.dataset.color === aiColor){
           // wait slightly longer than the capture animation timeout before continuing
@@ -1077,7 +1076,24 @@ function playVictoryTune(playerColor){
 
 function stopVictoryTune(){ if(!victoryNodes) return; try{ const n = victoryNodes; if(n.timeouts) n.timeouts.forEach(id=>clearTimeout(id)); if(n.oscs) n.oscs.forEach(o=>{ try{o.stop();}catch(e){} }); if(n.master){ const now = audioCtx.currentTime; n.master.gain.cancelScheduledValues(now); n.master.gain.setValueAtTime(n.master.gain.value, now); n.master.gain.linearRampToValueAtTime(0.0001, now + 0.3); setTimeout(()=>{ try{ n.master.disconnect(); }catch(e){} }, 400); } }catch(e){} finally { victoryNodes = null; } }
 
-function updateStatus(msg=''){ if(msg){ status.textContent = msg; return; } status.textContent = `Turn: ${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} | Score 🐲: ${scores.red} ⬄ 🦄: ${scores.blue}` + (chainMode ? ' — chain active' : ''); }
+function updateStatus(msg='') {
+  if (msg) { status.textContent = msg; return; }
+  // Basketball-style scoreboard
+  status.innerHTML = `
+    <div style="display:flex;justify-content:center;align-items:center;gap:32px;font-size:1.7em;font-weight:bold;letter-spacing:1px;">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+  <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:1.2em;font-weight:700;display:inline-block;">Red Dragons</span>
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:2.2em;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-top:4px;">${scores.red}</span>
+      </div>
+      <span style="font-size:1.6em;color:#fff;background:rgba(255,255,255,0.06);padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;">VS</span>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+  <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:1.2em;font-weight:700;display:inline-block;">Blue Unicorns</span>
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:2.2em;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-top:4px;">${scores.blue}</span>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:1em;color:#fff;background:rgba(255,255,255,0.06);padding:6px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;display:inline-block;">Turn: <b>${currentPlayer==='red'?'Red Dragons':'Blue Unicorns'}</b>${chainMode ? ' — <span style=\"color:#ffd26b;font-weight:bold;\">Chain Attack!</span>' : ''}</div>
+  `;
+}
 
 function makePawn(color){
   const pawn = document.createElement('div');
@@ -1250,7 +1266,7 @@ if(rulesBtn){
         <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
         <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
         <li>) Capturing a piece allows you to capture again if their is a target in sight. Causing a chain attack. ⚔️</li>
-        <li>) You can only have five pawns out at a time. 👁️</li>
+        <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
         <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
         <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
       </ol>
