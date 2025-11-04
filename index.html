@@ -16,11 +16,11 @@
     --tile-white-top: linear-gradient(180deg,#ffffff 0%, #f1f1f1 40%, #e6e6e6 100%);
     --tile-black-top: linear-gradient(180deg,#3a3a3a 0%, #2f2f2f 50%, #242424 100%);
     /* Rim variables (green theme) */
-    --tile-gold-1: #bff0c8; /* light green highlight */
-    --tile-gold-2: #2e9a4a; /* deeper green */
-  --tile-gold-edge: var(--tile-gold-2);
-  --tile-gold-glow: rgba(46,154,74,0.12);
-    --tile-gold-width: 2.5px; /* rim width (px) */
+    --tile-gold-1: #ffffff; /* light (now white) highlight */
+    --tile-gold-2: #ffffff; /* deeper (now white) */
+  --tile-gold-edge: transparent; /* rim removed */
+  --tile-gold-glow: transparent; /* glow removed */
+    --tile-gold-width: 0px; /* rim width set to 0 to disable edge */
   }
   html,body{height:100%;margin:0}
   body{
@@ -72,6 +72,13 @@
   button:focus{ outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
   button:disabled{ opacity:.45; cursor:not-allowed; filter: grayscale(0.2); }
 
+  /* Toggle button styling: match the other buttons exactly for color/appearance */
+  .toggle-btn{ padding-left: calc(12px * var(--scale)); padding-right: calc(12px * var(--scale)); display:inline-flex; align-items:center; gap:8px; 
+    /* match base button colors */
+    background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.18);
+  }
+  .toggle-btn.toggle-on, .toggle-btn.toggle-off { /* keep visual identical to other buttons */ background: rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.18); }
+
   /* Allow visual overflow for tile shadows, specular streaks and particle effects
     so bottom tiles aren't clipped. Add a little bottom padding to provide breathing room. */
   #boardWrap{display:flex;justify-content:center;width:100%;position:relative;overflow:visible;padding-bottom:calc(8px * var(--scale));}
@@ -94,7 +101,7 @@
   .white{
     background: var(--tile-white-top);
     color:#111;
-    border: 1px solid rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,1);
     box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.08),
                 inset 0 6px 12px rgba(255,255,255,0.7),
                 inset 0 -6px 10px rgba(0,0,0,0.04),
@@ -105,7 +112,7 @@
   .black{
     background: var(--tile-black-top);
     color:#fff;
-    border: 1px solid rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,1);
     box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.18),
                 inset 0 6px 10px rgba(255,255,255,0.04),
                 inset 0 -6px 12px rgba(0,0,0,0.45),
@@ -128,34 +135,8 @@
                 inset 0 2px 8px rgba(0,0,0,0.06),
                 0 0 0 calc(var(--tile-gold-width) * 1.2) var(--tile-gold-edge);
   }
-
-  /* Metallic specular streak: narrow blurred highlight that follows the tile curvature
-     - Uses ::after so it doesn't affect layout
-     - Intensifies on hover without moving the tile
-  */
-  .cell::after{
-    content: "";
-    position: absolute;
-    left: -10%;
-    top: 12%;
-    width: 120%;
-    height: 26%;
-    pointer-events: none;
-    border-radius: calc(6px * var(--scale));
-    transform: rotate(-18deg) scaleX(0.95);
-    background: linear-gradient(90deg, rgba(255,255,255,0.00) 0%, rgba(255,255,255,0.92) 42%, rgba(255,255,255,0.18) 58%, rgba(255,255,255,0.00) 100%);
-    filter: blur(calc(6px * var(--scale)));
-    opacity: 0.14;
-    mix-blend-mode: screen;
-    transition: opacity 160ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
-    z-index: 12; /* below pawns (pawn z-index:30) but above tile base */
-  }
-
-  /* increase streak brightness on hover (tile does not move) */
-  .cell:hover::after{
-    opacity: 0.34;
-    transform: rotate(-18deg) scaleX(1.02);
-  }
+  /* Tile specular streaks removed per user request */
+  .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
   .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
 
   .pawn{
@@ -275,6 +256,8 @@
   .flower-field { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
   .flower { position: absolute; opacity: var(--opa,0.22); transform-origin: center; will-change: transform, opacity; animation: flowerFloat var(--dur) linear infinite; user-select: none; font-family: serif; }
   @keyframes flowerFloat { 0% { transform: translateY(0) rotate(0deg) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } 50% { transform: translateY(-8px) rotate(var(--rot,0deg)) scale(calc(var(--scaleF,1) * 1.03)); opacity: calc(var(--opa,0.22) + 0.06); } 100% { transform: translateY(0) rotate(calc(var(--rot,0deg) * -1)) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } }
+  /* When paused (tab hidden or modal open) stop flower animations to save CPU */
+  .flower-field.paused .flower { animation-play-state: paused !important; opacity: 0.18; }
 
   @media (max-width:520px){
     :root{--scale:1; --tile:48px}
@@ -317,8 +300,9 @@
         <button id="resetBtn">Reset</button>
         <button id="undoBtn" disabled>Undo</button>
         <button id="redoBtn" disabled>Redo</button>
-        <button id="aiToggleBtn">Play vs AI</button>
-        <button id="rulesBtn">Rules</button>
+  <button id="aiToggleBtn">Play vs AI</button>
+  <button id="themeBtn">Theme</button>
+  <button id="rulesBtn">Rules</button>
       </div>
     </div>
   </div>
@@ -684,37 +668,170 @@ function showTrailAtCell(cellElem, color, destCell){
   }catch(e){ console.warn('trail error', e); }
 }
 
-// Flowers
+// Flowers: single-canvas renderer (less DOM, lower CPU). Draws emoji "flowers" at a capped FPS
 function initFlowers(){
   const field = document.getElementById('flowerField');
   if(!field) return;
+
+  // If we've previously created a canvas, clean it up first
+  try{
+    if(field._flowerCleanup){ field._flowerCleanup(); }
+  }catch(e){}
+
+  // clear any existing contents and create a canvas that fills the flower field
   field.innerHTML = '';
-  const emojis = ['🌸','🌼','🌺','🌻','🌷'];
+  const canvas = document.createElement('canvas');
+  canvas.className = 'flower-canvas';
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = 0;
+  field.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  // allow theme to override flower emojis (e.g., snow theme uses ❄️)
+  const emojis = (window.currentFlowerEmojis && Array.isArray(window.currentFlowerEmojis) && window.currentFlowerEmojis.length) ? window.currentFlowerEmojis : ['🌸','🌼','🌺','🌻','🌷'];
+
+  // Flower data
   const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
   const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
-  const base = Math.round(Math.min(40, Math.max(6, (vw * vh) / (1400 * 800) * 6)));
-  const count = Math.max(8, base) * 3;
-  for (let i = 0; i < count; i++){
-    const s = document.createElement('span');
-    s.className = 'flower';
-    s.textContent = emojis[Math.floor(Math.random() * emojis.length)];
-    s.style.left = (Math.random() * 120 - 10) + '%';
-    s.style.top = (Math.random() * 120 - 10) + '%';
-    s.style.setProperty('--dur', (5 + Math.random() * 8).toFixed(2) + 's');
-    s.style.setProperty('--scaleF', (0.8 + Math.random() * 0.9).toFixed(2));
-    s.style.setProperty('--rot', (Math.random() * 90 - 45).toFixed(1) + 'deg');
-    s.style.setProperty('--opa', (0.18 + Math.random() * 0.20).toFixed(2));
-    s.style.fontSize = Math.round(12 + Math.random() * 22) + 'px';
-    field.appendChild(s);
+  // choose a conservative count based on viewport area
+  // double the computed count to increase flower density
+  const count = Math.max(8, Math.round(Math.min(40, (vw * vh) / (1400 * 800) * 12))) * 2;
+  const flowers = [];
+
+  function rand(min, max){ return min + Math.random() * (max - min); }
+
+  function resizeCanvas(){
+    const rect = field.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    // if flowers empty, populate; otherwise, clamp positions inside new size
+    if(flowers.length === 0){
+      for(let i=0;i<count;i++){
+        // make flowers ~10x larger than before and slow their fall dramatically
+        // then apply the user's requested adjustments: reduce size by 30% and halve speed
+  const raw = Math.round(rand(100, 280));
+  // reduce size by 50% per user request (half the previous raw size)
+  const reduced = Math.max(8, Math.round(raw * 0.5));
+        flowers.push({
+          x: rand(0, w),
+          y: rand(0, h),
+          size: reduced,
+          baseSize: reduced,
+          // previous speed was rand(6,28)/1000 (px/ms) after the 10x slowdown
+          // halve that speed per user request => divide by 2000
+          speed: rand(6, 28) / 2000,
+          emoji: emojis[Math.floor(Math.random()*emojis.length)],
+          rot: rand(-0.6,0.6),
+          rotSpeed: rand(-0.0002,0.00036),
+          alpha: rand(0.10, 0.26),
+          floatPhase: Math.random() * Math.PI * 2
+        });
+      }
+    } else {
+      for(const f of flowers){
+        f.x = Math.max(0, Math.min(w, f.x));
+        f.y = Math.max(0, Math.min(h, f.y));
+      }
+    }
   }
-  let resizeTimer = null;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => {
-      field.innerHTML = '';
-      initFlowers();
-    }, 300);
-  });
+
+  // Animation control
+  let lastTs = 0;
+  const FPS = 30;
+  const frameInterval = 1000 / FPS;
+  let rafId = null;
+  let pauseTimer = null;
+
+  function drawFrame(ts){
+    // if overlays open or document hidden, pause drawing and poll occasionally
+    if(document.hidden || (typeof isAnyOverlayOpen === 'function' && isAnyOverlayOpen())){
+      if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+      if(pauseTimer) clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(()=>{ pauseTimer = null; rafId = requestAnimationFrame(drawFrame); }, 600);
+      return;
+    }
+
+    if(!lastTs) lastTs = ts;
+    const delta = ts - lastTs;
+    if(delta < frameInterval){
+      rafId = requestAnimationFrame(drawFrame);
+      return;
+    }
+    lastTs = ts;
+
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width; const h = rect.height;
+    ctx.clearRect(0,0,w,h);
+
+    for(const f of flowers){
+      // update position (gentle floating)
+      const dt = delta;
+      f.y += f.speed * dt * (0.6 + Math.sin(f.floatPhase + ts/900) * 0.6);
+      f.x += Math.sin((ts + f.x) / 1600) * 0.02 * (f.size/18);
+      f.rot += f.rotSpeed * dt;
+      f.floatPhase += dt * 0.0012;
+      // wrap vertically
+      if(f.y > h + f.size) f.y = -f.size;
+      if(f.y < -f.size) f.y = h + f.size;
+      if(f.x > w + f.size) f.x = -f.size;
+      if(f.x < -f.size) f.x = w + f.size;
+
+      ctx.save();
+      ctx.globalAlpha = f.alpha;
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rot);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      // font fallback to system emoji-capable font; size scales gently
+      const drawSize = f.baseSize * (0.86 + 0.14 * Math.sin((ts + f.x) / 900));
+      ctx.font = `${Math.round(drawSize)}px serif`;
+      ctx.fillText(f.emoji, 0, 0);
+      ctx.restore();
+    }
+
+    rafId = requestAnimationFrame(drawFrame);
+  }
+
+  // expose cleanup so re-init can cancel previous loop/listeners
+  function cleanup(){
+    try{ if(rafId) cancelAnimationFrame(rafId); rafId = null; }catch(e){}
+    try{ if(pauseTimer) clearTimeout(pauseTimer); pauseTimer = null; }catch(e){}
+    try{ window.removeEventListener('resize', onResize); }catch(e){}
+    try{ document.removeEventListener('visibilitychange', onVisibility); }catch(e){}
+    // remove canvas
+    try{ if(canvas && canvas.parentElement) canvas.parentElement.removeChild(canvas); }catch(e){}
+  }
+
+  function onResize(){
+    // debounce resize
+    if(field._flowerResizeTimer) clearTimeout(field._flowerResizeTimer);
+    field._flowerResizeTimer = setTimeout(()=>{ resizeCanvas(); }, 240);
+  }
+  function onVisibility(){
+    // on visibility change, just kick the loop so it can pause/resume quickly
+    if(document.hidden){ if(rafId){ cancelAnimationFrame(rafId); rafId = null; } }
+    else { if(!rafId) rafId = requestAnimationFrame(drawFrame); }
+  }
+
+  window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', onVisibility);
+
+  // store cleanup hook on field so repeated initFlowers calls can tear down
+  field._flowerCleanup = cleanup;
+
+  // initialize sizes and start loop
+  resizeCanvas();
+  rafId = requestAnimationFrame(drawFrame);
 }
 
 // Snapshots
@@ -951,8 +1068,9 @@ emojiPickerStyle.textContent = `
   .coin-choice.selected{
     background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
     /* keep soft shadow and add a thick white outline ring to indicate selection */
-    box-shadow: 0 6px 18px rgba(0,0,0,0.12), 0 0 0 4px rgba(255,255,255,0.95);
-    border-color: rgba(255,255,255,0.18);
+    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    /* thick white border when selected; use !important to override color rules for heads/tails */
+    border: 3px solid rgba(255,255,255,1) !important;
     position: relative;
     z-index: 2;
   }
@@ -1145,6 +1263,11 @@ function showCoinFlip(){
   }
   flipBtn.addEventListener('click', ()=>{
     if(!coinElem) return;
+    // Prevent multiple clicks: disable the flip button and lock the choice buttons
+    if(flipBtn.disabled) return;
+    flipBtn.disabled = true;
+    flipBtn.classList.add('disabled');
+    try{ choiceButtons.forEach(b=>{ b.style.pointerEvents = 'none'; b.classList.remove('selected'); }); }catch(e){}
     // start coin spin animation
     coinElem.classList.remove('spun');
     coinElem.classList.add('spinning');
@@ -1610,15 +1733,24 @@ redoBtn.addEventListener('click', () => redo());
 const newBtn = document.getElementById('newBtn');
 if(newBtn){ newBtn.addEventListener('click', ()=> { try{ window.location.reload(); }catch(e){ location.reload(); } }); }
 
-// AI toggle UI wiring
+// AI toggle UI wiring (now an accessible on/off toggle)
 const aiToggleBtn = document.getElementById('aiToggleBtn');
 if(aiToggleBtn){
-  // reflect default state in the button label
-  aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'Play vs AI';
+  aiToggleBtn.classList.add('toggle-btn');
+  function setAiBtnState(){
+    aiToggleBtn.setAttribute('aria-pressed', aiEnabled ? 'true' : 'false');
+    aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'AI: Off';
+    aiToggleBtn.classList.toggle('toggle-on', aiEnabled);
+    aiToggleBtn.classList.toggle('toggle-off', !aiEnabled);
+  }
+  // initialize state
+  setAiBtnState();
   aiToggleBtn.addEventListener('click', ()=>{
     aiEnabled = !aiEnabled;
-    aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'Play vs AI';
-    // if turned on and it's AI's turn, schedule it
+    // if turning off, cancel any scheduled AI timer immediately
+    if(!aiEnabled && _aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+    setAiBtnState();
+    // when enabled and it's AI's turn, schedule it
     if(aiEnabled) scheduleAiIfNeeded(320);
   });
 }
@@ -1656,23 +1788,69 @@ rulesStyle.textContent = `
   }
   .rules-overlay.show { opacity: 1; pointer-events: auto; }
   .rules-modal {
-    background: #fff; color: #222; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    background: #000; color: #fff; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
     padding: 32px 32px 24px 32px; max-width: 820px; width: 98vw; min-width: 420px; font-family: system-ui,Segoe UI,Arial; position: relative;
     animation: rulesPopIn 0.22s cubic-bezier(.6,1.6,.4,1) 1;
   }
   .rules-modal h1 { margin-top: 0; font-size: 1.5em; }
   .rules-modal ol { margin-top: 8px; }
   .rules-close {
-    position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 2em; color: #888; cursor: pointer;
+    position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 2em; color: #ddd; cursor: pointer;
     transition: color 0.18s; z-index: 1;
   }
-  .rules-close:hover { color: #d33; }
+  .rules-close:hover { color: #fff; }
   @keyframes rulesPopIn {
     0% { transform: scale(0.92) translateY(24px); opacity: 0; }
     100% { transform: scale(1) translateY(0); opacity: 1; }
   }
 `;
 document.head.appendChild(rulesStyle);
+
+// Theme button wiring — implement a lightweight 'snow' theme
+const themeBtn = document.getElementById('themeBtn');
+if(themeBtn){
+  // ensure a theme state exists; default theme is 'flowers'
+  if(!window.currentTheme) window.currentTheme = 'flowers';
+
+  // inject snow theme CSS (kept minimal and scoped to .theme-snow on body)
+  if(!document.getElementById('snowThemeStyle')){
+    const ts = document.createElement('style');
+    ts.id = 'snowThemeStyle';
+    ts.textContent = `
+      /* Theme 'snow' uses a dark blue gradient for a night/snow look */
+      body.theme-snow {
+        background: linear-gradient(180deg, #021024 0%, #02284a 45%, #06305f 100%);
+      }
+    `;
+    document.head.appendChild(ts);
+  }
+
+  function setTheme(t){
+    window.currentTheme = t || 'flowers';
+    if(window.currentTheme === 'snow'){
+      // apply snow background and flower emoji override
+      document.body.classList.add('theme-snow');
+      window.currentFlowerEmojis = ['❄️'];
+    } else {
+      // Flowers theme: remove snow class and use default floral emojis
+      document.body.classList.remove('theme-snow');
+      window.currentFlowerEmojis = null;
+    }
+    // reinitialize flowers to pick up emoji change
+    try{ if(typeof initFlowers === 'function') initFlowers(); }catch(e){}
+  // keep the button label static
+  themeBtn.textContent = 'Theme';
+  }
+
+    // cycle theme on click: Flowers -> Snow -> Flowers
+  themeBtn.addEventListener('click', ()=>{
+    const next = window.currentTheme === 'snow' ? 'flowers' : 'snow';
+    setTheme(next);
+  });
+
+  // ensure the button always reads 'Theme'
+  themeBtn.textContent = 'Theme';
+}
 
 // Rules Overlay JS
 const rulesBtn = document.getElementById('rulesBtn');
