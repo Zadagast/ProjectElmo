@@ -882,12 +882,15 @@ function takeSnapshot(){
     const cell = board.children[i];
     if(!cell) continue;
     const pawnEl = cell.querySelector('.pawn');
+    const isCapturedRed = cell.classList.contains('captured-red');
+    const isCapturedBlue = cell.classList.contains('captured-blue');
+    const captured = isCapturedRed || isCapturedBlue;
     if(pawnEl){
-      boardArr[i] = { pawn: pawnEl.dataset.color, moved: pawnEl.dataset.moved === 'true', captured: cell.classList.contains('captured-red') || cell.classList.contains('captured-blue') };
-    } else if (cell.classList.contains('captured-red')){
-      boardArr[i] = { pawn:'red', captured:true };
-    } else if (cell.classList.contains('captured-blue')){
-      boardArr[i] = { pawn:'blue', captured:true };
+      // There is a pawn DOM in this cell — record its color and moved flag.
+      boardArr[i] = { pawn: pawnEl.dataset.color, moved: pawnEl.dataset.moved === 'true', captured: captured, capturedBy: captured ? (isCapturedRed ? 'red' : 'blue') : null };
+    } else if(captured){
+      // Tile is captured but no pawn DOM is present (a previously captured tile).
+      boardArr[i] = { pawn: null, moved: false, captured: true, capturedBy: isCapturedRed ? 'red' : 'blue' };
     } else {
       boardArr[i] = null;
     }
@@ -910,51 +913,50 @@ function applySnapshot(snapshot){
   suppressSnapshots = true;
   // Always restore currentPlayer from snapshot
   try{
+    // First, normalize all cells: remove pawn DOM and captured classes, then
+    // re-add the checkerboard class (white/black) so styling is consistent.
     for(let i=0;i<25;i++){
       const cell = board.children[i];
       if(!cell) continue;
-      cell.innerHTML = '';
+      const existingPawn = cell.querySelector('.pawn');
+      if(existingPawn) existingPawn.remove();
       cell.classList.remove('captured-red','captured-blue','white','black');
       cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
     }
+
+    // Rebuild cells from snapshot entries. Important: only create/append a
+    // pawn DOM when the snapshot entry explicitly contains a pawn. For tiles
+    // that are captured but have no pawn DOM (previously captured tiles left
+    // behind), we must not append a pawn — only apply the captured-* class.
     for(let i=0;i<25;i++){
       const entry = snapshot.board[i];
       const cell = board.children[i];
       if(!cell) continue;
-      // If the snapshot indicates the tile is captured, show the captured
-      // styling and do NOT append a pawn element (captured tiles are not
-      // represented by pawn DOM nodes). This prevents duplicate pawn visuals
-      // when restoring a captured state.
-      if(entry && entry.captured){
-        // Captured tiles should retain their captured-* class and also have
-        // the attacking pawn element present (the pawn occupies the captured tile).
-        cell.innerHTML = '';
-        cell.classList.remove('captured-red','captured-blue');
-        cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
-        // append the pawn DOM so chainPawn and interactions are restored
-        const pawn = makePawn(entry.pawn);
-        pawn.dataset.color = entry.pawn;
-        pawn.dataset.moved = entry.moved ? 'true' : 'false';
-        cell.appendChild(pawn);
-        pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+
+      if(entry && entry.captured && entry.pawn == null){
+        // Captured tile with no pawn DOM: show the captured class only.
+        if(entry.capturedBy === 'red') cell.classList.add('captured-red');
+        else if(entry.capturedBy === 'blue') cell.classList.add('captured-blue');
         continue;
       }
 
-      // If snapshot has a non-captured pawn, restore it
       if(entry && entry.pawn){
-        cell.classList.remove('captured-red','captured-blue');
-        cell.innerHTML = '';
+        // There should be a pawn DOM here — recreate it and set moved flag.
         const pawn = makePawn(entry.pawn);
-        pawn.dataset.color = entry.pawn;
         pawn.dataset.moved = entry.moved ? 'true' : 'false';
         cell.appendChild(pawn);
         pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+        // If this pawn occupies a captured tile, restore the captured class
+        if(entry.captured && entry.capturedBy){
+          if(entry.capturedBy === 'red') cell.classList.add('captured-red');
+          else if(entry.capturedBy === 'blue') cell.classList.add('captured-blue');
+        }
         continue;
       }
 
-      // No pawn and not captured: ensure the cell is cleared
+      // Empty, non-captured tile — ensure no captured class and no pawn DOM
       cell.classList.remove('captured-red','captured-blue');
-      cell.innerHTML = '';
+      // nothing to append
     }
 
     scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
@@ -990,43 +992,63 @@ function updateUndoRedoButtons(){
   redoBtn.disabled = redoStack.length === 0;
 }
 function undo(){
+  // Undo a single logical move. Snapshots may be grouped into multiple
+  // entries per move; we pop snapshots until we remove a snapshot that was
+  // marked as __countAsMove (the marker is set on the snapshot that ends a move).
   if(undoStack.length <= 1) return;
-  // Remove the last move and restore the previous state
-  const last = undoStack.pop();
-  redoStack.push(last);
+  // Pop snapshots into redoStack until we've popped at least one snapshot
+  // and the last popped snapshot has __countAsMove === true
+  let popped = null;
+  do {
+    popped = undoStack.pop();
+    if(!popped) break;
+    redoStack.push(popped);
+  } while(undoStack.length > 0 && !popped.__countAsMove);
+
+  // Apply the new top-of-stack snapshot (the state before the undone move)
   const prev = undoStack[undoStack.length - 1];
   if(prev) {
     applySnapshot(prev);
-    // Turn and chain attack state are restored from snapshot
-    // Cancel any AI that was previously scheduled so the user can continue to
-    // press Undo/Redo without the AI interrupting. We debounce resuming the AI
-    // for a short period to allow quick consecutive undos.
-    if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
-    // Reset any previous resume timer
-    if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
-    // Schedule AI to resume after a short debounce window (allowing rapid undos)
-    _undoAiResumeTimer = setTimeout(()=>{
-      _undoAiResumeTimer = null;
-      if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
-    }, 620);
-    updateUndoRedoButtons();
   }
-  updateStatus(); // Always show scoreboard
-}
-function redo(){
-  if(redoStack.length === 0) return;
-  const snap = redoStack.pop();
-  applySnapshot(snap);
-  undoStack.push(snap);
-  updateStatus(); // Always show scoreboard
-  // Cancel any AI that was previously scheduled and debounce resuming the AI
+
+  // Cancel any scheduled AI and debounce resuming it so the user can press
+  // Undo multiple times quickly without the AI interrupting.
   if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
   if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
   _undoAiResumeTimer = setTimeout(()=>{
     _undoAiResumeTimer = null;
     if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
   }, 620);
+
   updateUndoRedoButtons();
+  updateStatus();
+}
+function redo(){
+  // Redo a single logical move: pop snapshots from redoStack and push them
+  // onto undoStack until we've pushed the snapshot that ends a move
+  if(redoStack.length === 0) return;
+  let applied = null;
+  do {
+    const snap = redoStack.pop();
+    if(!snap) break;
+    undoStack.push(snap);
+    applied = snap;
+  } while(redoStack.length > 0 && applied && !applied.__countAsMove);
+
+  // Apply the snapshot now at the top of the undoStack
+  const top = undoStack[undoStack.length - 1];
+  if(top) applySnapshot(top);
+
+  // Debounce AI resumption similar to undo
+  if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
+  _undoAiResumeTimer = setTimeout(()=>{
+    _undoAiResumeTimer = null;
+    if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
+  }, 620);
+
+  updateUndoRedoButtons();
+  updateStatus(); // Always show scoreboard
 }
 // Ensure AI is scheduled if undo/redo left it as the active player
 function _postUndoRedo(){ scheduleAiIfNeeded(240); }
