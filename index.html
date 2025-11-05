@@ -57,6 +57,55 @@
   .panel-backdrop { width:100%; background: rgba(0,0,0,0.10); border-radius:calc(12px * var(--scale)); padding:calc(14px * var(--scale)); box-shadow: 0 12px 38px rgba(0,0,0,0.14); backdrop-filter: blur(5px); display:flex; flex-direction:column; align-items:center; gap:calc(12px * var(--scale)); }
 
   #controls{display:flex;flex-wrap:wrap;gap:calc(8px * var(--scale));justify-content:center;width:100%}
+  /* Group for primary actions (New / Reset) to match UI theming */
+  .primary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  /* keep layout consistent on narrow viewports */
+  @media (max-width:520px){ .primary-actions{ width:100%; justify-content:center } }
+  /* secondary group for undo/redo buttons — match primary-actions styling */
+  .secondary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .secondary-actions{ width:100%; justify-content:center } }
+  /* tertiary group for AI / Theme / Rules buttons — match primary-actions styling */
+  .tertiary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .tertiary-actions{ width:100%; justify-content:center } }
+  /* separate group just for Rules / Credits to match themed boxes */
+  .rules-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .rules-actions{ width:100%; justify-content:center } }
   button{
     padding:calc(8px * var(--scale)) calc(12px * var(--scale));
     border-radius:calc(8px * var(--scale));
@@ -295,14 +344,23 @@
       </header>
 
       <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
-      <div id="controls" style="margin-top:24px;">
-        <button id="newBtn">New</button>
-        <button id="resetBtn">Reset</button>
-        <button id="undoBtn" disabled>Undo</button>
-        <button id="redoBtn" disabled>Redo</button>
-  <button id="aiToggleBtn">Play vs AI</button>
-  <button id="themeBtn">Theme</button>
-  <button id="rulesBtn">Rules</button>
+  <div id="controls" style="margin-top:calc(8px * var(--scale));display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center">
+        <div class="primary-actions" aria-hidden="false">
+          <button id="newBtn">New</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+        <div class="secondary-actions" aria-hidden="false">
+          <button id="undoBtn" disabled>Undo</button>
+          <button id="redoBtn" disabled>Redo</button>
+        </div>
+        <div class="tertiary-actions" aria-hidden="false">
+          <button id="aiToggleBtn">Play vs AI</button>
+          <button id="themeBtn">Theme</button>
+        </div>
+        <div class="rules-actions" aria-hidden="false">
+          <button id="rulesBtn">Rules</button>
+          <button id="creditsBtn">Credits</button>
+        </div>
       </div>
     </div>
   </div>
@@ -1177,26 +1235,28 @@ emojiPickerOverlay.className = 'emoji-picker-overlay';
 emojiPickerOverlay.setAttribute('aria-hidden','false');
 emojiPickerOverlay.innerHTML = `
   <div class="emoji-picker-modal">
+    <div class="emoji-box" style="min-width:360px; min-height:160px;">
       <div style="margin-top:10px;text-align:center;">
         <div class="side-chooser" style="display:flex;gap:12px;justify-content:center;">
           <button type="button" class="side-option selected" data-side="red">Play as Red</button>
           <button type="button" class="side-option" data-side="blue">Play as Blue</button>
         </div>
       </div>
-    <div class="emoji-chooser-row">
-      <div class="emoji-chooser">
-        <div class="emoji-chooser-title">Red team</div>
-        <div class="emoji-options" id="emojiOptionsRed"></div>
-        <div style="margin-top:8px;text-align:center;"><input id="teamNameRed" class="team-name-input" placeholder="Team name (e.g. Dragons)" /></div>
+      <div class="emoji-chooser-row">
+        <div class="emoji-chooser">
+          <div class="emoji-chooser-title">Red team</div>
+          <div class="emoji-options" id="emojiOptionsRed"></div>
+          <div style="margin-top:8px;text-align:center;"><input id="teamNameRed" class="team-name-input" placeholder="Team name (e.g. Dragons)" /></div>
+        </div>
+        <div class="emoji-chooser">
+          <div class="emoji-chooser-title">Blue team</div>
+          <div class="emoji-options" id="emojiOptionsBlue"></div>
+          <div style="margin-top:8px;text-align:center;"><input id="teamNameBlue" class="team-name-input" placeholder="Team name (e.g. Unicorns)" /></div>
+        </div>
       </div>
-      <div class="emoji-chooser">
-        <div class="emoji-chooser-title">Blue team</div>
-        <div class="emoji-options" id="emojiOptionsBlue"></div>
-        <div style="margin-top:8px;text-align:center;"><input id="teamNameBlue" class="team-name-input" placeholder="Team name (e.g. Unicorns)" /></div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+        <button id="emojiConfirmBtn">Confirm</button>
       </div>
-    </div>
-    <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
-      <button id="emojiConfirmBtn">Confirm</button>
     </div>
   </div>
 `;
@@ -1316,10 +1376,24 @@ emojiPickerStyle.textContent = `
     70%  { transform: rotateY(1620deg) scale(1.04); } /* slowing down */
     100% { transform: rotateY(1800deg) scale(1); }    /* settle */
   }
+  /* coin result color states */
+  .coin.result-red .coin-face.front{ background: radial-gradient(circle at 30% 30%, #ffd6d6, #ff9a9a 40%, #ff6b6b 70%); }
+  .coin.result-red .coin-face.back{ background: radial-gradient(circle at 30% 30%, #e7f2ff, #bfe0ff 40%, #79b9ff 70%); }
+  .coin.result-blue .coin-face.front{ background: radial-gradient(circle at 30% 30%, #e7f2ff, #bfe0ff 40%, #79b9ff 70%); }
+  .coin.result-blue .coin-face.back{ background: radial-gradient(circle at 30% 30%, #ffd6d6, #ff9a9a 40%, #ff6b6b 70%); }
   /* Flip button styling (prominent CTA) */
   #flipCoinBtn{ padding:14px 26px; font-size:1.12em; font-weight:800; border-radius:12px; border:none; background: linear-gradient(90deg,#ffd66b,#ffb84a); color:#111; box-shadow: 0 12px 34px rgba(0,0,0,0.32); cursor:pointer; transition: transform 140ms ease, box-shadow 140ms ease; }
   #flipCoinBtn:hover{ transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.36); }
   #flipCoinBtn:disabled{ opacity:0.6; cursor:not-allowed; transform:none; box-shadow: 0 8px 22px rgba(0,0,0,0.18); }
+  /* curved white border around the emoji picker content (match credits/rules) */
+  #emojiPickerOverlay .emoji-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    margin-top: calc(6px * var(--scale));
+    text-align: center;
+  }
 `;
 document.head.appendChild(emojiPickerStyle);
 
@@ -1447,6 +1521,7 @@ function showCoinFlip(){
   window.coinFlipActive = true;
   emojiPickerOverlay.innerHTML = `
     <div class="emoji-picker-modal" style="text-align:center;">
+      <div class="emoji-box">
           <div class="coin-title">Select heads or tails and flip the coin to see who goes first.</div>
           <div class="coin-choices">
             <label class="coin-choice selected" data-choice="heads"><input type="radio" name="coinChoice" value="heads" checked style="display:none" aria-hidden="true">Heads</label>
@@ -1460,6 +1535,7 @@ function showCoinFlip(){
           </div>
       <div style="display:flex;justify-content:center;gap:12px;">
         <button id="flipCoinBtn">Flip Coin</button>
+      </div>
       </div>
     </div>
   `;
@@ -1495,6 +1571,8 @@ function showCoinFlip(){
   flipBtn.classList.add('disabled');
   try{ choiceButtons.forEach(b=>{ b.style.pointerEvents = 'none'; /* keep .selected so the user's choice stays highlighted during spin */ }); }catch(e){}
     // start coin spin animation
+    // clear any previous result styling
+    coinElem.classList.remove('result-red','result-blue');
     coinElem.classList.remove('spun');
     coinElem.classList.add('spinning');
     // small visual sequence: animate the coin, then reveal winner
@@ -1512,6 +1590,11 @@ function showCoinFlip(){
   const bSpan = back && back.querySelector('.coin-emoji');
   if(fSpan) fSpan.textContent = winnerTeam === 'red' ? (window.selectedEmoji.red || '🔴') : (window.selectedEmoji.blue || '🔵');
   if(bSpan) bSpan.textContent = winnerTeam === 'red' ? (window.selectedEmoji.blue || '🔵') : (window.selectedEmoji.red || '🔴');
+  // apply colored result class so coin face backgrounds match winner
+  if(coinElem){
+    coinElem.classList.remove('result-red','result-blue');
+    coinElem.classList.add(winnerTeam === 'red' ? 'result-red' : 'result-blue');
+  }
       finishWith(winnerTeam);
     }, 3500);
   });
@@ -1707,7 +1790,7 @@ function scheduleAiIfNeeded(delay = 420){
 function isAnyOverlayOpen(){
   try{
     // Check the main overlays by id if they exist
-    const ids = ['emojiPickerOverlay','rulesOverlay','victoryOverlay'];
+      const ids = ['emojiPickerOverlay','rulesOverlay','victoryOverlay','creditsOverlay'];
     for(const id of ids){
       const el = document.getElementById(id);
       if(!el) continue;
@@ -2054,20 +2137,40 @@ rulesOverlay.setAttribute('aria-hidden', 'true');
 rulesOverlay.innerHTML = `
   <div class="rules-modal">
     <button class="rules-close" id="rulesCloseBtn" aria-label="Close Rules">&times;</button>
-    <h1>Welcome to Tic-Tac-Attack! 👋</h1>
-    <p>A game that combines pawns from chess with tic-tac-toe! Here are the rules. ♟️</p>
-    <ol>
-      <li>) You are allowed one move per turn. ➡️</li>
-      <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
-      <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
-      <li>) Capturing a piece allows that piece capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
-      <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
-      <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
-      <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
-    </ol>
+    <div class="rules-box" style="min-width:420px; min-height:160px;">
+      <h1>Welcome to Tic-Tac-Attack! 👋</h1>
+      <p>A game that combines pawns from chess with tic-tac-toe! Here are the rules. ♟️</p>
+      <ol>
+        <li>) You are allowed one move per turn. ➡️</li>
+        <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
+        <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
+        <li>) Capturing a piece allows that piece capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
+        <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
+        <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
+        <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
+      </ol>
+    </div>
   </div>
 `;
 document.body.appendChild(rulesOverlay);
+
+// Credits Overlay HTML (visually identical to rules overlay but no text)
+const creditsOverlay = document.createElement('div');
+creditsOverlay.id = 'creditsOverlay';
+creditsOverlay.className = 'rules-overlay';
+creditsOverlay.setAttribute('aria-hidden', 'true');
+creditsOverlay.innerHTML = `
+  <div class="rules-modal">
+    <button class="rules-close" id="creditsCloseBtn" aria-label="Close Credits">&times;</button>
+    <div class="credits-box" style="min-width:320px; min-height:120px;">
+      <h1 style="margin-top:0;">Credits</h1>
+      <p style="margin:8px 0 6px 0;"><strong>Developer:</strong> Edward Frosch A.K.A. Roachclip 🪳</p>
+      <p style="margin:6px 0;"><strong>Bug Tester:</strong> Istillloveyou ❤️</p>
+      <p style="margin:6px 0 0 0;"><strong>Bug Tester:</strong> Pyranto 🔥</p>
+    </div>
+  </div>
+`;
+document.body.appendChild(creditsOverlay);
 
 // Rules Overlay CSS
 const rulesStyle = document.createElement('style');
@@ -2092,7 +2195,7 @@ rulesStyle.textContent = `
   .rules-modal h1 { margin-top: 0; font-size: 1.5em; }
   .rules-modal ol { margin-top: 8px; }
   .rules-close {
-    position: absolute; top: 12px; right: 16px; background: none; border: none; font-size: 2em; color: #ddd; cursor: pointer;
+    position: absolute; top: 6px; right: 16px; background: none; border: none; font-size: 2em; color: #ddd; cursor: pointer;
     transition: color 0.18s; z-index: 1;
   }
   .rules-close:hover { color: #fff; }
@@ -2100,6 +2203,56 @@ rulesStyle.textContent = `
     0% { transform: scale(0.92) translateY(24px); opacity: 0; }
     100% { transform: scale(1) translateY(0); opacity: 1; }
   }
+  /* Curved white border around credits text */
+  #creditsOverlay .credits-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    /* ensure the modal close button doesn't overlap the credits box */
+    margin-top: calc(24px * var(--scale));
+    text-align: center;
+    min-width: 380px;
+    min-height: 160px;
+  }
+  #creditsOverlay .credits-box h1{
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.25em;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+  /* confetti elements that float up and fade */
+  .credits-confetti-container{ position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .credit-confetti{
+    position: absolute;
+    bottom: 8%;
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+    display: inline-block;
+    animation: confettiRise 2.6s ease-in forwards;
+  }
+  @keyframes confettiRise{
+    0%{ opacity: 0; transform: translateY(0) rotate(0deg); }
+    10%{ opacity: 1; }
+    100%{ opacity: 0; transform: translateY(-220px) rotate(420deg); }
+  }
+  /* Make the credits modal slightly larger and more spacious on wider viewports */
+  #creditsOverlay .rules-modal{
+    width: min(560px, 92vw);
+    padding: 36px;
+  }
+  /* Curved white border for rules content (match credits box styling) */
+  #rulesOverlay .rules-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    margin-top: calc(24px * var(--scale));
+    text-align: left;
+  }
+  #rulesOverlay .rules-box h1{ margin-top: 0; margin-bottom: 8px; }
 `;
 document.head.appendChild(rulesStyle);
 
@@ -2174,6 +2327,61 @@ document.getElementById('rulesCloseBtn').onclick = ()=>{
   rulesOverlay.classList.remove('show');
   rulesOverlay.setAttribute('aria-hidden', 'true');
 };
+
+const creditsBtn = document.getElementById('creditsBtn');
+if(creditsBtn){
+  creditsBtn.addEventListener('click', ()=>{
+    const el = document.getElementById('creditsOverlay');
+    if(!el) return;
+    // show overlay and launch a small confetti animation
+    el.classList.add('show');
+    el.setAttribute('aria-hidden', 'false');
+    launchCreditsConfetti(el);
+  });
+}
+const creditsClose = document.getElementById('creditsCloseBtn');
+if(creditsClose){
+  creditsClose.onclick = ()=>{
+    const el = document.getElementById('creditsOverlay');
+    if(!el) return;
+    el.classList.remove('show');
+    el.setAttribute('aria-hidden', 'true');
+    clearCreditsConfetti(el);
+  };
+}
+
+// Small confetti animation for the credits overlay
+function launchCreditsConfetti(overlay){
+  try{
+    clearCreditsConfetti(overlay);
+    const container = document.createElement('div');
+    container.className = 'credits-confetti-container';
+    // create a handful of emoji confetti
+    const emojis = ['✨','🪶','🎉','⭐','🌟','🪳'];
+    for(let i=0;i<14;i++){
+      const s = document.createElement('span');
+      s.className = 'credit-confetti';
+      s.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+      // randomize starting position
+      s.style.left = (10 + Math.random()*80) + '%';
+      s.style.animationDelay = (Math.random()*0.6) + 's';
+      s.style.fontSize = (14 + Math.random()*18) + 'px';
+      container.appendChild(s);
+    }
+    overlay.appendChild(container);
+    // store reference for cleanup
+    overlay._confettiContainer = container;
+  }catch(e){ console.warn('confetti error', e); }
+}
+
+function clearCreditsConfetti(overlay){
+  try{
+    if(!overlay) return;
+    const c = overlay._confettiContainer;
+    if(c && c.parentNode) c.parentNode.removeChild(c);
+    overlay._confettiContainer = null;
+  }catch(e){ /* ignore */ }
+}
 
 init();
 if (typeof initFlowers === 'function') initFlowers();
