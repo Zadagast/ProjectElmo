@@ -344,6 +344,7 @@ const MAX_PAWNS_PER_PLAYER = 5;
 let aiEnabled = true;             // toggle whether AI takes turns (ON by default)
 let aiColor = 'blue';            // which color the AI will play
 let _aiTimer = null;             // scheduled timer id for AI thinking
+let _aiSession = 0;              // incrementing token to invalidate pending AI work during undos
 
 
 const undoStack = [];
@@ -387,12 +388,18 @@ function playCaptureMelody(level = 1, dest = null){ try { ensureAudioContext(); 
 // ----------------------
 // AI move logic
 // ----------------------
-function aiTakeTurn(){
+function aiTakeTurn(session){
+  // session token guards: if the global session has changed since this
+  // aiTurn was scheduled, abort to avoid acting on stale state.
+  if(typeof session !== 'number' || session !== _aiSession) return;
   if(!aiEnabled) return;
   if(currentPlayer !== aiColor) return;
   // small randomized thinking delay to feel natural
   const thinkDelay = 260 + Math.floor(Math.random() * 320);
+  const localSession = session;
   setTimeout(()=>{
+    // if session invalidated while thinking, abort
+    if(localSession !== _aiSession) return;
     (function(){
       try{
         // 1) If chain mode is active and chainPawn exists, continue capturing from it
@@ -1014,6 +1021,9 @@ function undo(){
   // Cancel any scheduled AI and debounce resuming it so the user can press
   // Undo multiple times quickly without the AI interrupting.
   if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  // Invalidate any pending AI work so an AI action that already started
+  // thinking will abort when its session token is checked.
+  _aiSession++;
   if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
   _undoAiResumeTimer = setTimeout(()=>{
     _undoAiResumeTimer = null;
@@ -1041,6 +1051,7 @@ function redo(){
 
   // Debounce AI resumption similar to undo
   if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  _aiSession++;
   if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
   _undoAiResumeTimer = setTimeout(()=>{
     _undoAiResumeTimer = null;
@@ -1100,15 +1111,38 @@ function onCellClick(cell){
   const row = Math.floor(idx / 5);
   // If a chain attack is active, disallow spawning or moving any pawn other than
   // the chain pawn that performed the capture. Spawning new pawns must wait
-  // until the chain is resolved.
+  // until the chain is resolved. However, if the player clicks the chain
+  // pawn's current cell while a one-time final decision is allowed
+  // (chainAllowLastMove), consume that allowance and end the chain without
+  // moving the pawn (this lets the player 'choose to stay' by clicking).
   if(chainMode && chainPawn){
-    updateStatus('Finish the chain attack with the capturing pawn before spawning.');
+    const pawnInCell = cell.querySelector('.pawn');
+    // If the player clicked the chain pawn's current tile, allow them to
+    // consume/end the chain immediately (no movement) — this works at any
+    // point during the chain, not only when chainAllowLastMove is set.
+    if(pawnInCell === chainPawn){
+      // clear chain state
+      chainAllowLastMove = false;
+      chainMode = false;
+      chainPawn = null;
+      chainCount = 0;
+      chainPrevIdx = null;
+      // after ending the chain, check for a win then switch turn and record
+      if(!checkWinCapturedThreeInRow(currentPlayer)) {
+        switchTurn();
+        recordSnapshot({ countAsMove: true });
+      } else {
+        recordSnapshot({ countAsMove: true });
+      }
+      return;
+    }
+    // Clicking anywhere else while a chain is active should be ignored.
     return;
   }
   if((currentPlayer === 'red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
   if(cell.querySelector('.pawn')) return;
   if(countPawns(currentPlayer) >= MAX_PAWNS_PER_PLAYER){
-    updateStatus(`${currentPlayer==='red'?'🐲 (red)':'🦄 (blue)'} already has ${MAX_PAWNS_PER_PLAYER} pawns on the board`);
+    // Reached the maximum pawns for this player — silently ignore spawn attempts.
     return;
   }
 
@@ -1184,28 +1218,92 @@ emojiPickerStyle.textContent = `
   .emoji-picker-modal button:hover{ background:#111 }
   .team-name-input{ width:88%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); color:#fff }
   /* Side chooser buttons */
-  .side-option{ padding:8px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:#fff; cursor:pointer; font-weight:700 }
-  .side-option.selected{ background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); box-shadow: 0 6px 18px rgba(0,0,0,0.12); border-color: rgba(255,255,255,0.18) }
-  /* Coin flip choice buttons */
-  .coin-choices{ display:flex; gap:10px; justify-content:center; margin-top:8px }
-  .coin-choice{ padding:10px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.02); color:#fff; cursor:pointer; font-weight:700; font-size:1.0em }
-  .coin-choice.selected{
+  .side-option{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:14px 12px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    color:#fff;
+    cursor:pointer;
+    font-weight:800;
+    font-size:1.15em;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+    flex: 0 0 160px; /* fixed width parity with coin choices */
+    min-width: 140px;
+    text-align:center;
+    box-sizing: border-box;
+  }
+  .side-option:hover{ box-shadow: 0 18px 38px rgba(0,0,0,0.26); }
+  .side-option.selected{
     background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
-    /* keep soft shadow and add a thick white outline ring to indicate selection */
-    box-shadow: 0 6px 18px rgba(0,0,0,0.12);
-    /* thick white border when selected; use !important to override color rules for heads/tails */
+    box-shadow: 0 18px 38px rgba(0,0,0,0.28);
     border: 3px solid rgba(255,255,255,1) !important;
     position: relative;
-    z-index: 2;
+    z-index: 3;
+  }
+  /* Coin flip choice buttons (enlarged & enhanced) */
+  /* curved white box around the coin title */
+  .coin-title {
+    font-weight:800;
+    font-size:1.08em;
+    margin-bottom:12px;
+    letter-spacing:0.4px;
+    display:inline-block;
+    background: #000000; /* black box background */
+    color: #ffffff; /* white text */
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid #ffffff; /* white border */
+    box-shadow: 0 8px 20px rgba(0,0,0,0.42);
+    max-width: 92%;
+    line-height: 1.15;
+  }
+  /* ensure both coin choice buttons are identical size and aligned; remove hover movement */
+  .coin-choices{ display:flex; gap:14px; justify-content:center; margin-top:12px; align-items:center; }
+  .coin-choice{
+    padding:14px 12px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    color:#fff;
+    cursor:pointer;
+    font-weight:800;
+    font-size:1.15em;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex: 0 0 160px; /* fixed width for parity */
+    min-width: 140px;
+    text-align:center;
+    box-sizing: border-box;
+  }
+  /* on hover only change shadow/border — do NOT translate/scale */
+  .coin-choice:hover{ box-shadow: 0 18px 38px rgba(0,0,0,0.26); }
+  .coin-choice.selected{
+    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    /* stronger shadow and thick white outline to indicate selection */
+    box-shadow: 0 18px 38px rgba(0,0,0,0.28);
+    border: 3px solid rgba(255,255,255,1) !important;
+    position: relative;
+    z-index: 3;
+    /* removed transform so selected button doesn't move */
   }
   /* Color the coin choice buttons to indicate team mapping: heads -> blue, tails -> red */
-  .coin-choice[data-choice="heads"]{ background: linear-gradient(90deg,#2b8cff,#1f6fe8); border-color: rgba(40,140,255,0.18); color:#fff }
-  .coin-choice[data-choice="tails"]{ background: linear-gradient(90deg,#ff6b6b,#e04444); border-color: rgba(255,100,100,0.18); color:#fff }
+  .coin-choice[data-choice="heads"]{ background: linear-gradient(90deg,#2b8cff,#1f6fe8); border-color: rgba(40,140,255,0.28); color:#fff }
+  .coin-choice[data-choice="tails"]{ background: linear-gradient(90deg,#ff6b6b,#e04444); border-color: rgba(255,100,100,0.28); color:#fff }
   /* Coin result visual and spinning animation (3D coin with two faces) */
   #coinResult{ will-change: transform; display:inline-block; perspective:1200px; }
-  .coin{ --coin-size: min(144px, 36vw); width:var(--coin-size); height:var(--coin-size); display:inline-block; position:relative; transform-style:preserve-3d; overflow:hidden; }
-  .coin-face{ position:absolute; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; border-radius:50%; backface-visibility:hidden; -webkit-backface-visibility:hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.45), inset 0 6px 18px rgba(255,255,255,0.04); font-size: 0; line-height:1; }
-  .coin-emoji{ display:inline-block; font-size: calc(var(--coin-size) * 0.95); line-height:1; transform: translateY(-6%); }
+  /* make the coin 15% smaller overall by scaling the computed coin size */
+  .coin{ --coin-size: calc(min(220px, 48vw) * 0.85); width:var(--coin-size); height:var(--coin-size); display:inline-block; position:relative; transform-style:preserve-3d; overflow:hidden; box-shadow: 0 18px 48px rgba(0,0,0,0.36); border-radius: 50%; }
+  .coin-face{ position:absolute; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; border-radius:50%; backface-visibility:hidden; -webkit-backface-visibility:hidden; box-shadow: 0 12px 36px rgba(0,0,0,0.5), inset 0 8px 20px rgba(255,255,255,0.05); font-size: 0; line-height:1; }
+  /* enlarge the emoji used as the coin face so it fills more of the coin */
+  .coin-emoji{ display:inline-block; font-size: calc(var(--coin-size) * 0.94); line-height:1; transform: translateY(-4%); text-shadow: 0 4px 10px rgba(0,0,0,0.35); }
   .coin-face.front{ background: radial-gradient(circle at 30% 30%, #fff9d9, #ffd66b 40%, #f0b54a 70%); }
   .coin-face.back{ transform: rotateY(180deg); background: radial-gradient(circle at 30% 30%, #fbfbfb, #d6d6d6 40%, #b0b0b0 70%); }
   /* thinner rim for a subtler 3D edge */
@@ -1218,6 +1316,10 @@ emojiPickerStyle.textContent = `
     70%  { transform: rotateY(1620deg) scale(1.04); } /* slowing down */
     100% { transform: rotateY(1800deg) scale(1); }    /* settle */
   }
+  /* Flip button styling (prominent CTA) */
+  #flipCoinBtn{ padding:14px 26px; font-size:1.12em; font-weight:800; border-radius:12px; border:none; background: linear-gradient(90deg,#ffd66b,#ffb84a); color:#111; box-shadow: 0 12px 34px rgba(0,0,0,0.32); cursor:pointer; transition: transform 140ms ease, box-shadow 140ms ease; }
+  #flipCoinBtn:hover{ transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.36); }
+  #flipCoinBtn:disabled{ opacity:0.6; cursor:not-allowed; transform:none; box-shadow: 0 8px 22px rgba(0,0,0,0.18); }
 `;
 document.head.appendChild(emojiPickerStyle);
 
@@ -1345,7 +1447,7 @@ function showCoinFlip(){
   window.coinFlipActive = true;
   emojiPickerOverlay.innerHTML = `
     <div class="emoji-picker-modal" style="text-align:center;">
-          <div style="font-weight:700;margin-bottom:8px;">Flip a coin to see who goes first.</div>
+          <div class="coin-title">Select heads or tails and flip the coin to see who goes first.</div>
           <div class="coin-choices">
             <label class="coin-choice selected" data-choice="heads"><input type="radio" name="coinChoice" value="heads" checked style="display:none" aria-hidden="true">Heads</label>
             <label class="coin-choice" data-choice="tails"><input type="radio" name="coinChoice" value="tails" style="display:none" aria-hidden="true">Tails</label>
@@ -1387,11 +1489,11 @@ function showCoinFlip(){
   }
   flipBtn.addEventListener('click', ()=>{
     if(!coinElem) return;
-    // Prevent multiple clicks: disable the flip button and lock the choice buttons
-    if(flipBtn.disabled) return;
-    flipBtn.disabled = true;
-    flipBtn.classList.add('disabled');
-    try{ choiceButtons.forEach(b=>{ b.style.pointerEvents = 'none'; b.classList.remove('selected'); }); }catch(e){}
+  // Prevent multiple clicks: disable the flip button and lock the choice buttons
+  if(flipBtn.disabled) return;
+  flipBtn.disabled = true;
+  flipBtn.classList.add('disabled');
+  try{ choiceButtons.forEach(b=>{ b.style.pointerEvents = 'none'; /* keep .selected so the user's choice stays highlighted during spin */ }); }catch(e){}
     // start coin spin animation
     coinElem.classList.remove('spun');
     coinElem.classList.add('spinning');
@@ -1598,7 +1700,7 @@ function scheduleAiIfNeeded(delay = 420){
   if(typeof isAnyOverlayOpen === 'function' ? isAnyOverlayOpen() : (window.coinFlipActive)) return;
   if(!aiEnabled) return;
   if(currentPlayer !== aiColor) return;
-  _aiTimer = setTimeout(()=>{ _aiTimer = null; try{ aiTakeTurn(); }catch(e){ console.warn('AI error', e); } }, delay);
+  _aiTimer = setTimeout(()=>{ _aiTimer = null; try{ aiTakeTurn(_aiSession); }catch(e){ console.warn('AI error', e); } }, delay);
 }
 
 // Return true if any known modal/overlay is currently visible/open.
@@ -2005,7 +2107,8 @@ document.head.appendChild(rulesStyle);
 const themeBtn = document.getElementById('themeBtn');
 if(themeBtn){
   // ensure a theme state exists; default theme is 'flowers'
-  if(!window.currentTheme) window.currentTheme = 'flowers';
+  // default to the 'snow' theme on first load
+  if(!window.currentTheme) window.currentTheme = 'snow';
 
   // inject theme CSS for snow and space themes (scoped to body classes)
   if(!document.getElementById('themeStyles')){
@@ -2054,6 +2157,9 @@ if(themeBtn){
 
   // ensure the button always reads 'Theme'
   themeBtn.textContent = 'Theme';
+  // apply the initial theme immediately so the page loads using the default
+  // (e.g., 'snow') instead of waiting for the user to click the button.
+  try{ setTheme(window.currentTheme); }catch(e){ /* ignore if setTheme not defined */ }
 }
 
 // Rules Overlay JS
