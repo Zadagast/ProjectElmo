@@ -1,0 +1,12 @@
+{
+  "name": "project-elmo-multiplayer",
+  "version": "1.0.0",
+  "description": "Lightweight WebSocket server for Project Elmo (Attack-Tac-Toe) multiplayer",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  }
+}
