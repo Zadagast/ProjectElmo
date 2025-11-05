@@ -1398,12 +1398,12 @@ emojiPickerStyle.textContent = `
 document.head.appendChild(emojiPickerStyle);
 
 // default emoji choices (restricted to the allowed set)
-const EMOJI_CHOICES = ['🧜‍♀️','🧙‍♂️','😈','🐲','🦄','🦖','🤡','👽','🤖','💩','😺','🐶','🐸','🐔','🧸'];
+const EMOJI_CHOICES = ['🧜‍♀️','🧙‍♂️','😈','🐲','🦄','🦖','🤡','👽','🤖','💩','😺','🐶','🐸','🐔','😇'];
 // mapping from emoji to a human-friendly team name (plural where appropriate)
 const EMOJI_TO_NAME = {
   '🧜‍♀️': 'Mermaids',
   '🧙‍♂️': 'Wizards',
-  '😈': 'Imps',
+  '😈': 'Devils',
   '🐲': 'Dragons',
   '🦄': 'Unicorns',
   '🦖': 'Dinosaurs',
@@ -1415,7 +1415,7 @@ const EMOJI_TO_NAME = {
   '🐶': 'Dogs',
   '🐸': 'Frogs',
   '🐔': 'Chickens',
-  '🧸': 'Teddies'
+  '😇': 'Angels'
 };
 // sensible defaults from the allowed set
 window.selectedEmoji = { red: '🐲', blue: '🦄' };
@@ -2358,7 +2358,7 @@ function launchCreditsConfetti(overlay){
     container.className = 'credits-confetti-container';
     // create a handful of emoji confetti
     const emojis = ['✨','🪶','🎉','⭐','🌟','🪳'];
-    for(let i=0;i<14;i++){
+    for(let i=0;i<28;i++){
       const s = document.createElement('span');
       s.className = 'credit-confetti';
       s.textContent = emojis[Math.floor(Math.random()*emojis.length)];
