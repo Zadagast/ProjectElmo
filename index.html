@@ -334,6 +334,8 @@ let dragged = null;
 let chainMode = false;
 let chainPawn = null;
 let chainCount = 0;
+let chainPrevIdx = null; // index the chain pawn came from (allow stepping back)
+let chainAllowLastMove = false; // when true, allow one final non-capture decision at end of a chain
 let scores = { red:0, blue:0 };
 
 const MAX_PAWNS_PER_PLAYER = 5;
@@ -347,6 +349,9 @@ let _aiTimer = null;             // scheduled timer id for AI thinking
 const undoStack = [];
 const redoStack = [];
 let suppressSnapshots = false;
+// timer used to delay resuming the AI after user-initiated undo/redo actions.
+// This lets the user press Undo multiple times quickly without the AI intervening.
+let _undoAiResumeTimer = null;
 
 const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -388,111 +393,147 @@ function aiTakeTurn(){
   // small randomized thinking delay to feel natural
   const thinkDelay = 260 + Math.floor(Math.random() * 320);
   setTimeout(()=>{
-    try{
-      // 1) If chain mode is active and chainPawn exists, continue capturing from it
-      if(chainMode && chainPawn && chainPawn.dataset.color === aiColor){
-        const caps = availableDiagonalCapturesFromCell(chainPawn.parentElement);
-        if(caps && caps.length > 0){
-          const target = caps[Math.floor(Math.random() * caps.length)];
-          dragged = chainPawn;
-          try{ handleDrop(new Event('ai-capture'), target.cell); }catch(e){ console.warn('AI capture drop failed', e); }
+    (function(){
+      try{
+        // 1) If chain mode is active and chainPawn exists, continue capturing from it
+        if(chainMode && chainPawn && chainPawn.dataset.color === aiColor){
+          const caps = availableDiagonalCapturesFromCell(chainPawn.parentElement);
+          if(caps && caps.length > 0){
+            const target = caps[Math.floor(Math.random() * caps.length)];
+            dragged = chainPawn;
+            try{ handleDrop(new Event('ai-capture'), target.cell); }catch(e){ console.warn('AI capture drop failed', e); }
+            return;
+          }
+          // If there are no immediate captures from the chain pawn, the AI
+          // must not move other pieces — it may only use the one-time final
+          // non-capture move (chainAllowLastMove) with the same pawn. Find a
+          // legal non-capture move for the chain pawn only and perform it.
+          if(chainAllowLastMove){
+            try{
+              const fromCell = chainPawn.parentElement;
+              if(fromCell){
+                const fromIdx = Number(fromCell.dataset.index);
+                const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+                const candidates = [];
+                for(let nx = fx-1; nx <= fx+1; nx++){
+                  for(let ny = fy-1; ny <= fy+1; ny++){
+                    if(nx < 0 || nx >= 5 || ny < 0 || ny >= 5) continue;
+                    const toIdx = ny * 5 + nx; if(toIdx === fromIdx) continue;
+                    const dest = board.children[toIdx]; if(!dest) continue;
+                    if(dest.querySelector('.pawn')) continue; // must be empty
+                    const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+                    // apply same chain diagonal allowance used for player swipes
+                    if(isDiagonal(dx, dy)){
+                      const adj1 = board.children[fy * 5 + nx];
+                      const adj2 = board.children[ny * 5 + fx];
+                      const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+                      const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+                      if(toIdx !== chainPrevIdx && !(adj1Empty || adj2Empty)) continue;
+                    }
+                    if(isValidMove(dx, dy) || canDoubleStep(chainPawn, fromIdx, toIdx)){
+                      candidates.push(dest);
+                    }
+                  }
+                }
+                if(candidates.length > 0){
+                  const choice = candidates[Math.floor(Math.random() * candidates.length)];
+                  dragged = chainPawn;
+                  try{ handleDrop(new Event('ai-move'), choice); }catch(e){ console.warn('AI chain final move failed', e); }
+                }
+              }
+            }catch(e){ console.warn('AI chain final-move error', e); }
+          }
+          // Whether we moved or not, do not allow the AI to act with other pawns while chainMode persists
           return;
         }
-      }
 
-      // 2) Search for any capturing moves for the AI
-      const captureMoves = [];
-      for(let i=0;i<25;i++){
-        const cell = board.children[i]; if(!cell) continue;
-        const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
-        const caps = availableDiagonalCapturesFromCell(cell);
-        if(caps && caps.length > 0){
-          captureMoves.push({ pawn: p, from: cell, caps });
-        }
-      }
-      if(captureMoves.length > 0){
-        // prefer captures that lead to further captures (simple lookahead)
-        let chosen = null;
-        for(const cand of captureMoves){
-          for(const c of cand.caps){
-            // simulate the capture by temporarily moving pawn to that cell and checking further captures
-            const tmpPawn = cand.pawn; const targetCell = c.cell;
-            // quick heuristic: if further captures exist from that landing spot, prefer it
-            // we can't easily simulate game internals, but we can check adjacent diagonals of that target
-            const further = availableDiagonalCapturesFromCell(targetCell);
-            if(further && further.length > 0){ chosen = { pawn: tmpPawn, target: targetCell }; break; }
+        // 2) Search for any capturing moves for the AI
+        const captureMoves = [];
+        for(let i=0;i<25;i++){
+          const cell = board.children[i]; if(!cell) continue;
+          const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
+          const caps = availableDiagonalCapturesFromCell(cell);
+          if(caps && caps.length > 0){
+            captureMoves.push({ pawn: p, from: cell, caps });
           }
-          if(chosen) break;
         }
-        if(!chosen){ // fallback pick random capture
-          const group = captureMoves[Math.floor(Math.random() * captureMoves.length)];
-          const cap = group.caps[Math.floor(Math.random() * group.caps.length)];
-          chosen = { pawn: group.pawn, target: cap.cell };
+        if(captureMoves.length > 0){
+          // prefer captures that lead to further captures (simple lookahead)
+          let chosen = null;
+          for(const cand of captureMoves){
+            for(const c of cand.caps){
+              const tmpPawn = cand.pawn; const targetCell = c.cell;
+              const further = availableDiagonalCapturesFromCell(targetCell);
+              if(further && further.length > 0){ chosen = { pawn: tmpPawn, target: targetCell }; break; }
+            }
+            if(chosen) break;
+          }
+          if(!chosen){
+            const group = captureMoves[Math.floor(Math.random() * captureMoves.length)];
+            const cap = group.caps[Math.floor(Math.random() * group.caps.length)];
+            chosen = { pawn: group.pawn, target: cap.cell };
+          }
+          if(chosen){ dragged = chosen.pawn; try{ handleDrop(new Event('ai-capture'), chosen.target); }catch(e){ console.warn('AI handleDrop failed', e); } }
+          return;
         }
-        if(chosen){ dragged = chosen.pawn; try{ handleDrop(new Event('ai-capture'), chosen.target); }catch(e){ console.warn('AI handleDrop failed', e); } }
-        return;
-      }
 
-      // 3) If AI has fewer than max pawns, randomly choose to spawn or move
-      const homeRow = aiColor === 'red' ? 4 : 0;
-      const canSpawn = countPawns(aiColor) < MAX_PAWNS_PER_PLAYER;
-      const spawnCandidates = [];
-      if(canSpawn) {
-        for(let c=0;c<5;c++){
-          const idx = homeRow*5 + c; const cell = board.children[idx]; if(cell && !cell.querySelector('.pawn')) spawnCandidates.push(cell);
+        // 3) If AI has fewer than max pawns, randomly choose to spawn or move
+        const homeRow = aiColor === 'red' ? 4 : 0;
+        const canSpawn = countPawns(aiColor) < MAX_PAWNS_PER_PLAYER;
+        const spawnCandidates = [];
+        if(canSpawn) {
+          for(let c=0;c<5;c++){
+            const idx = homeRow*5 + c; const cell = board.children[idx]; if(cell && !cell.querySelector('.pawn')) spawnCandidates.push(cell);
+          }
         }
-      }
-      const possibleMoves = [];
-      for(let i=0;i<25;i++){
-        const cell = board.children[i]; if(!cell) continue;
-        const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
-        const fromIdx = i; const fx = fromIdx % 5; const fy = Math.floor(fromIdx/5);
-        // Try all single-step moves
-        for(let nx = fx-1; nx <= fx+1; nx++){
-          for(let ny = fy-1; ny <= fy+1; ny++){
-            if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
-            const toIdx = ny*5 + nx; if(toIdx === fromIdx) continue;
-            const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
-            const dest = board.children[toIdx]; if(!dest) continue;
-            if(dest.querySelector('.pawn')) continue; // not empty
-            if(isValidMove(dx,dy)){
-              possibleMoves.push({ pawn: p, from: cell, to: dest });
+        const possibleMoves = [];
+        for(let i=0;i<25;i++){
+          const cell = board.children[i]; if(!cell) continue;
+          const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
+          const fromIdx = i; const fx = fromIdx % 5; const fy = Math.floor(fromIdx/5);
+          for(let nx = fx-1; nx <= fx+1; nx++){
+            for(let ny = fy-1; ny <= fy+1; ny++){
+              if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
+              const toIdx = ny*5 + nx; if(toIdx === fromIdx) continue;
+              const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+              const dest = board.children[toIdx]; if(!dest) continue;
+              if(dest.querySelector('.pawn')) continue;
+              if(isValidMove(dx,dy)){
+                possibleMoves.push({ pawn: p, from: cell, to: dest });
+              }
+            }
+          }
+          if(p.dataset.moved !== 'true') {
+            let doubleStepIdx = null;
+            if(p.dataset.color === 'red') {
+              if(fy >= 2) doubleStepIdx = (fy-2)*5 + fx;
+            } else {
+              if(fy <= 2) doubleStepIdx = (fy+2)*5 + fx;
+            }
+            if(doubleStepIdx !== null) {
+              const dest = board.children[doubleStepIdx];
+              if(dest && !dest.querySelector('.pawn') && canDoubleStep(p, fromIdx, doubleStepIdx)) {
+                possibleMoves.push({ pawn: p, from: cell, to: dest });
+              }
             }
           }
         }
-        // Try double-step (first move only)
-        if(p.dataset.moved !== 'true') {
-          // For red, double-step is two rows up; for blue, two rows down
-          let doubleStepIdx = null;
-          if(p.dataset.color === 'red') {
-            if(fy >= 2) doubleStepIdx = (fy-2)*5 + fx;
-          } else {
-            if(fy <= 2) doubleStepIdx = (fy+2)*5 + fx;
-          }
-          if(doubleStepIdx !== null) {
-            const dest = board.children[doubleStepIdx];
-            if(dest && !dest.querySelector('.pawn') && canDoubleStep(p, fromIdx, doubleStepIdx)) {
-              possibleMoves.push({ pawn: p, from: cell, to: dest });
-            }
-          }
+        if(canSpawn && spawnCandidates.length > 0 && (possibleMoves.length === 0 || Math.random() < 0.5)) {
+          const choice = spawnCandidates[Math.floor(Math.random() * spawnCandidates.length)];
+          try{ onCellClick(choice); }catch(e){ console.warn('AI place failed', e); }
+          return;
         }
-      }
-      // If can spawn and there is an open home row cell, randomly choose to spawn or move
-      if(canSpawn && spawnCandidates.length > 0 && (possibleMoves.length === 0 || Math.random() < 0.5)) {
-        const choice = spawnCandidates[Math.floor(Math.random() * spawnCandidates.length)];
-        try{ onCellClick(choice); }catch(e){ console.warn('AI place failed', e); }
-        return;
-      }
-      if(possibleMoves.length > 0){
-        const mv = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-        dragged = mv.pawn;
-        try{ handleDrop(new Event('ai-move'), mv.to); }catch(e){ console.warn('AI move failed', e); }
-        // switchTurn will be handled by game logic; scheduleAiIfNeeded will run there if needed
-        return;
-      }
+        if(possibleMoves.length > 0){
+          const mv = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+          dragged = mv.pawn;
+          try{ handleDrop(new Event('ai-move'), mv.to); }catch(e){ console.warn('AI move failed', e); }
+          return;
+        }
 
-      // nothing to do — pass
-    }catch(e){ console.warn('AI unexpected error', e); }
+        // nothing to do — pass
+      }catch(e){ console.warn('AI unexpected error', e); }
+    })();
+  // AI has finished its decision (or passed). No special undo-block state is used now.
   }, thinkDelay);
 }
 
@@ -858,6 +899,8 @@ function takeSnapshot(){
     chainMode: !!chainMode,
     chainCount: chainCount || 0,
     chainPawnIdx: (chainPawn && chainPawn.parentElement) ? Number(chainPawn.parentElement.dataset.index) : null,
+    chainPrevIdx: (typeof chainPrevIdx === 'number') ? chainPrevIdx : null,
+    chainAllowLastMove: !!chainAllowLastMove,
     ts: Date.now()
   };
 }
@@ -878,19 +921,48 @@ function applySnapshot(snapshot){
       const entry = snapshot.board[i];
       const cell = board.children[i];
       if(!cell) continue;
-      if(entry && entry.pawn){
-        if(entry.captured) cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
+      // If the snapshot indicates the tile is captured, show the captured
+      // styling and do NOT append a pawn element (captured tiles are not
+      // represented by pawn DOM nodes). This prevents duplicate pawn visuals
+      // when restoring a captured state.
+      if(entry && entry.captured){
+        // Captured tiles should retain their captured-* class and also have
+        // the attacking pawn element present (the pawn occupies the captured tile).
+        cell.innerHTML = '';
+        cell.classList.remove('captured-red','captured-blue');
+        cell.classList.add(entry.pawn === 'red' ? 'captured-red' : 'captured-blue');
+        // append the pawn DOM so chainPawn and interactions are restored
         const pawn = makePawn(entry.pawn);
-        if(entry.moved) pawn.dataset.moved = 'true'; else pawn.dataset.moved = 'false';
+        pawn.dataset.color = entry.pawn;
+        pawn.dataset.moved = entry.moved ? 'true' : 'false';
         cell.appendChild(pawn);
         pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+        continue;
       }
+
+      // If snapshot has a non-captured pawn, restore it
+      if(entry && entry.pawn){
+        cell.classList.remove('captured-red','captured-blue');
+        cell.innerHTML = '';
+        const pawn = makePawn(entry.pawn);
+        pawn.dataset.color = entry.pawn;
+        pawn.dataset.moved = entry.moved ? 'true' : 'false';
+        cell.appendChild(pawn);
+        pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+        continue;
+      }
+
+      // No pawn and not captured: ensure the cell is cleared
+      cell.classList.remove('captured-red','captured-blue');
+      cell.innerHTML = '';
     }
 
     scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
     chainMode = !!snapshot.chainMode;
     chainCount = snapshot.chainCount || 0;
     chainPawn = null;
+    chainPrevIdx = (typeof snapshot.chainPrevIdx === 'number') ? snapshot.chainPrevIdx : null;
+    chainAllowLastMove = !!snapshot.chainAllowLastMove;
     if(typeof snapshot.chainPawnIdx === 'number' && snapshot.chainPawnIdx >= 0 && snapshot.chainPawnIdx < 25){
       const cpCell = board.children[snapshot.chainPawnIdx];
       if(cpCell) chainPawn = cpCell.querySelector('.pawn');
@@ -912,7 +984,11 @@ function recordSnapshot(opts = { countAsMove: true }){
   if(countAsMove) redoStack.length = 0;
   updateUndoRedoButtons();
 }
-function updateUndoRedoButtons(){ undoBtn.disabled = undoStack.length <= 1; redoBtn.disabled = redoStack.length === 0; }
+function updateUndoRedoButtons(){
+  // Disable undo when there's no earlier snapshot available
+  undoBtn.disabled = undoStack.length <= 1;
+  redoBtn.disabled = redoStack.length === 0;
+}
 function undo(){
   if(undoStack.length <= 1) return;
   // Remove the last move and restore the previous state
@@ -922,7 +998,18 @@ function undo(){
   if(prev) {
     applySnapshot(prev);
     // Turn and chain attack state are restored from snapshot
-    scheduleAiIfNeeded(240);
+    // Cancel any AI that was previously scheduled so the user can continue to
+    // press Undo/Redo without the AI interrupting. We debounce resuming the AI
+    // for a short period to allow quick consecutive undos.
+    if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+    // Reset any previous resume timer
+    if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
+    // Schedule AI to resume after a short debounce window (allowing rapid undos)
+    _undoAiResumeTimer = setTimeout(()=>{
+      _undoAiResumeTimer = null;
+      if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
+    }, 620);
+    updateUndoRedoButtons();
   }
   updateStatus(); // Always show scoreboard
 }
@@ -932,7 +1019,14 @@ function redo(){
   applySnapshot(snap);
   undoStack.push(snap);
   updateStatus(); // Always show scoreboard
-  scheduleAiIfNeeded(240);
+  // Cancel any AI that was previously scheduled and debounce resuming the AI
+  if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
+  _undoAiResumeTimer = setTimeout(()=>{
+    _undoAiResumeTimer = null;
+    if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
+  }, 620);
+  updateUndoRedoButtons();
 }
 // Ensure AI is scheduled if undo/redo left it as the active player
 function _postUndoRedo(){ scheduleAiIfNeeded(240); }
@@ -942,7 +1036,8 @@ function resetBoard(){
   board.innerHTML = '';
   scores = { red:0, blue:0 };
   currentPlayer = 'red';
-  dragged = null; chainMode = false; chainPawn = null; chainCount = 0;
+  dragged = null; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null;
+  chainAllowLastMove = false;
 
   for(let i=0;i<25;i++){
     const cell = document.createElement('div');
@@ -981,6 +1076,13 @@ function resetBoard(){
 function onCellClick(cell){
   const idx = Number(cell.dataset.index);
   const row = Math.floor(idx / 5);
+  // If a chain attack is active, disallow spawning or moving any pawn other than
+  // the chain pawn that performed the capture. Spawning new pawns must wait
+  // until the chain is resolved.
+  if(chainMode && chainPawn){
+    updateStatus('Finish the chain attack with the capturing pawn before spawning.');
+    return;
+  }
   if((currentPlayer === 'red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
   if(cell.querySelector('.pawn')) return;
   if(countPawns(currentPlayer) >= MAX_PAWNS_PER_PLAYER){
@@ -1357,7 +1459,20 @@ function handleDrop(e, targetCell){
   // If a chain is active, disallow diagonal moves that are not captures
   if(chainMode && chainPawn){
     if(isDiagonal(dx,dy) && !(existing && existing.dataset.color !== pawn.dataset.color)){
-      return;
+      // allow diagonal non-capture moves during a chain if at least one orthogonal
+      // adjacent tile in the movement L-shape is empty (provides a clear path)
+      const fx = fromIdx % 5, fy = Math.floor(fromIdx/5);
+      const tx = toIdx % 5, ty = Math.floor(toIdx/5);
+      const adj1 = board.children[fy * 5 + tx]; // tile at (tx, fy)
+      const adj2 = board.children[ty * 5 + fx]; // tile at (fx, ty)
+      const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+      const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+      // allow stepping back to the previous square of the chain pawn
+      if(toIdx === chainPrevIdx) {
+        // permitted if the previous square is empty (should be empty because pawn moved)
+      } else if(!(adj1Empty || adj2Empty)){
+        return;
+      }
     }
   }
 
@@ -1383,6 +1498,8 @@ function handleDrop(e, targetCell){
       if(further.length > 0){
         chainMode = true;
         chainPawn = pawn;
+        // remember where this pawn came from so it can step back if needed
+        chainPrevIdx = fromIdx;
         dragged = pawn;
         recordSnapshot({ countAsMove: true });
         updateStatus();
@@ -1392,18 +1509,22 @@ function handleDrop(e, targetCell){
           setTimeout(()=> scheduleAiIfNeeded(260), 260);
         }
       } else {
-        chainMode = false;
-        chainPawn = null;
-        chainCount = 0;
-        dragged = null;
-        if(checkWinCapturedThreeInRow(currentPlayer)) {
-          recordSnapshot({ countAsMove: true });
-          return;
-        }
-        switchTurn();
+        // No immediate captures remain — allow the pawn one final non-capture decision.
+        // Keep chain mode active but mark that the pawn is allowed one last move.
+        chainMode = true;
+        chainPawn = pawn;
+        chainPrevIdx = fromIdx;
+        chainAllowLastMove = true;
+        dragged = pawn;
+        // record the state so undo/redo will restore the fact that a final
+        // choice is available (this does not count as an extra move)
         recordSnapshot({ countAsMove: true });
-        // schedule AI for next player (if applicable)
-        scheduleAiIfNeeded();
+        updateStatus();
+        // AI should not auto-continue here; schedule only if AI is the current actor
+        if(aiEnabled && pawn.dataset.color === aiColor){
+          // let the AI decide — it may choose to use the final move
+          setTimeout(()=> scheduleAiIfNeeded(260), 260);
+        }
       }
     }, 220);
     return;
@@ -1421,6 +1542,24 @@ function handleDrop(e, targetCell){
   pawn.dataset.moved = 'true';
   playPlacementSound();
   showPlacementEffect(targetCell);
+  // If this move was the one-time final decision after a chain with no further captures,
+  // consume that allowance and end the chain before switching turns.
+  if(chainAllowLastMove && pawn === chainPawn){
+    chainAllowLastMove = false;
+    chainMode = false;
+    chainPawn = null;
+    chainCount = 0;
+    chainPrevIdx = null;
+    // after consuming final decision, check for a win then switch turn as usual
+    if(!checkWinCapturedThreeInRow(currentPlayer)) {
+      switchTurn();
+      recordSnapshot({ countAsMove: true });
+    } else {
+      recordSnapshot({ countAsMove: true });
+    }
+    return;
+  }
+
   if(!checkWinCapturedThreeInRow(currentPlayer)) {
     switchTurn();
     recordSnapshot({ countAsMove: true });
@@ -1429,7 +1568,7 @@ function handleDrop(e, targetCell){
   }
 }
 
-function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; scheduleAiIfNeeded(); }
+function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null; chainAllowLastMove = false; scheduleAiIfNeeded(); }
 // When turn switches, if AI is enabled and it's the AI's color, schedule its move.
 function scheduleAiIfNeeded(delay = 420){
   if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
@@ -1586,7 +1725,7 @@ function updateStatus(msg='') {
         <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:2.2em;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-top:4px;">${scores.blue}</span>
       </div>
     </div>
-    <div style="margin-top:8px;font-size:1em;color:#fff;background:rgba(255,255,255,0.06);padding:6px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;display:inline-block;">Turn: <b>${currentPlayer==='red'? redLabel : blueLabel}</b>${chainMode ? ' — <span style="color:#ffd26b;font-weight:bold;">Chain Attack!</span>' : ''}</div>
+    <div style="margin-top:8px;font-size:1em;color:#fff;background:rgba(255,255,255,0.06);padding:6px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;display:inline-block;">Turn: <b>${currentPlayer==='red'? redLabel : blueLabel}</b>${chainMode ? ' — <span style="color:#ffd26b;font-weight:bold;">Chain Attack!</span>' : ''}${chainAllowLastMove ? ' — <span style="color:#ffd26b;font-weight:bold;">Final move allowed</span>' : ''}</div>
   `;
   if (msg) {
     status.innerHTML = `<div>${msg}</div>` + scoreboardHTML;
@@ -1619,10 +1758,19 @@ function makePawn(color){
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
       if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
-        chainMode = false; chainPawn = null; chainCount = 0; dragged = null; recordSnapshot({ countAsMove: true });
-        if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
-        ev.preventDefault();
-        return;
+        // Instead of immediately ending the chain, allow the chain pawn one
+        // final non-capture decision. Mark that allowance and persist state.
+        if(pawn === chainPawn){
+          chainAllowLastMove = true;
+          // snapshot this state (not counted as an extra move)
+          recordSnapshot({ countAsMove: false });
+        } else {
+          // non-chain pawn may not move
+          dragged = null;
+          ev.preventDefault();
+          resumeIdle();
+          return;
+        }
       }
       if (pawn !== chainPawn) { ev.preventDefault(); resumeIdle(); return; }
     }
@@ -1637,10 +1785,13 @@ function makePawn(color){
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
       if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
-        chainMode = false; chainPawn = null; chainCount = 0; dragged = null; recordSnapshot({ countAsMove: true });
-        if(!checkWinCapturedThreeInRow(currentPlayer)) switchTurn();
-        resumeIdle();
-        return;
+        if(pawn === chainPawn){
+          chainAllowLastMove = true;
+          recordSnapshot({ countAsMove: false });
+        } else {
+          resumeIdle();
+          return;
+        }
       }
       if (pawn !== chainPawn) { resumeIdle(); return; }
     }
@@ -1682,10 +1833,25 @@ function makePawn(color){
                 const existing = targetCell.querySelector('.pawn');
                 if(chainMode && chainPawn && Math.abs(delta.dx) === 1 && Math.abs(delta.dy) === 1){
                   if(!(existing && existing.dataset.color !== pawn.dataset.color)){
-                    swipeStart = null;
-                    setTimeout(()=> pawn.classList.remove('dragging'), 40);
-                    resumeIdle();
-                    return;
+                    // allow diagonal non-capture swipe during a chain if one of the
+                    // orthogonal adjacent tiles is empty (so the pawn can step around)
+                    const fromIdx = Number(pawn.parentElement.dataset.index);
+                    const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+                    const tx = fx + delta.dx, ty = fy + delta.dy;
+                    const adj1 = board.children[fy * 5 + tx];
+                    const adj2 = board.children[ty * 5 + fx];
+                    const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+                    const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+                    // allow stepping back to the previous square of the chain pawn
+                    const toIdx = ty * 5 + tx;
+                    if(toIdx === chainPrevIdx){
+                      // permitted if the previous square is empty (it should be empty because pawn moved)
+                    } else if(!(adj1Empty || adj2Empty || chainAllowLastMove)){
+                      swipeStart = null;
+                      setTimeout(()=> pawn.classList.remove('dragging'), 40);
+                      resumeIdle();
+                      return;
+                    }
                   }
                 }
                 const dxCells = Math.abs(tx - fx), dyCells = Math.abs(ty - fy);
@@ -1770,7 +1936,7 @@ rulesOverlay.innerHTML = `
       <li>) You are allowed one move per turn. ➡️</li>
       <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
       <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
-      <li>) Capturing a piece allows you to capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
+      <li>) Capturing a piece allows that piece capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
       <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
       <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
       <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
@@ -1789,7 +1955,14 @@ rulesStyle.textContent = `
   .rules-overlay.show { opacity: 1; pointer-events: auto; }
   .rules-modal {
     background: #000; color: #fff; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-    padding: 32px 32px 24px 32px; max-width: 820px; width: 98vw; min-width: 420px; font-family: system-ui,Segoe UI,Arial; position: relative;
+    padding: 28px 28px 20px 28px;
+    /* size the modal to fit its text content while respecting small viewports */
+    width: max-content;
+    display: inline-block;
+    text-align: left;
+    max-width: 92vw;
+    font-family: system-ui,Segoe UI,Arial;
+    position: relative;
     animation: rulesPopIn 0.22s cubic-bezier(.6,1.6,.4,1) 1;
   }
   .rules-modal h1 { margin-top: 0; font-size: 1.5em; }
@@ -1812,14 +1985,18 @@ if(themeBtn){
   // ensure a theme state exists; default theme is 'flowers'
   if(!window.currentTheme) window.currentTheme = 'flowers';
 
-  // inject snow theme CSS (kept minimal and scoped to .theme-snow on body)
-  if(!document.getElementById('snowThemeStyle')){
+  // inject theme CSS for snow and space themes (scoped to body classes)
+  if(!document.getElementById('themeStyles')){
     const ts = document.createElement('style');
-    ts.id = 'snowThemeStyle';
+    ts.id = 'themeStyles';
     ts.textContent = `
       /* Theme 'snow' uses a dark blue gradient for a night/snow look */
       body.theme-snow {
         background: linear-gradient(180deg, #021024 0%, #02284a 45%, #06305f 100%);
+      }
+      /* Theme 'space' uses a very dark grey gradient to emulate deep space */
+      body.theme-space {
+        background: linear-gradient(180deg, #0b0b0b 0%, #111216 45%, #19191c 100%);
       }
     `;
     document.head.appendChild(ts);
@@ -1827,24 +2004,29 @@ if(themeBtn){
 
   function setTheme(t){
     window.currentTheme = t || 'flowers';
+    // clear any theme classes first
+    document.body.classList.remove('theme-snow');
+    document.body.classList.remove('theme-space');
     if(window.currentTheme === 'snow'){
-      // apply snow background and flower emoji override
       document.body.classList.add('theme-snow');
       window.currentFlowerEmojis = ['❄️'];
+    } else if(window.currentTheme === 'space'){
+      document.body.classList.add('theme-space');
+      // use a single star emoji for space theme
+      window.currentFlowerEmojis = ['⭐'];
     } else {
-      // Flowers theme: remove snow class and use default floral emojis
-      document.body.classList.remove('theme-snow');
+      // Flowers theme: use default floral emojis
       window.currentFlowerEmojis = null;
     }
     // reinitialize flowers to pick up emoji change
     try{ if(typeof initFlowers === 'function') initFlowers(); }catch(e){}
-  // keep the button label static
-  themeBtn.textContent = 'Theme';
+    // keep the button label static
+    themeBtn.textContent = 'Theme';
   }
 
-    // cycle theme on click: Flowers -> Snow -> Flowers
+  // cycle theme on click: Flowers -> Snow -> Space -> Flowers
   themeBtn.addEventListener('click', ()=>{
-    const next = window.currentTheme === 'snow' ? 'flowers' : 'snow';
+    const next = window.currentTheme === 'flowers' ? 'snow' : (window.currentTheme === 'snow' ? 'space' : 'flowers');
     setTheme(next);
   });
 
