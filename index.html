@@ -1,0 +1,2475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Attack-Tac-Toe v005.1 — Attack-Tac-</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root{
+    --scale:1.25;
+    --bg1:#0b6b2d;
+    --bg2:#18a058;
+    --tile:calc(60px * var(--scale));
+    /* Tile theming for embossed appearance */
+    --tile-border: rgba(0,0,0,0.14);
+    --tile-highlight: rgba(255,255,255,0.18);
+    --tile-white-top: linear-gradient(180deg,#ffffff 0%, #f1f1f1 40%, #e6e6e6 100%);
+    --tile-black-top: linear-gradient(180deg,#3a3a3a 0%, #2f2f2f 50%, #242424 100%);
+    /* Rim variables (green theme) */
+    --tile-gold-1: #ffffff; /* light (now white) highlight */
+    --tile-gold-2: #ffffff; /* deeper (now white) */
+  --tile-gold-edge: transparent; /* rim removed */
+  --tile-gold-glow: transparent; /* glow removed */
+    --tile-gold-width: 0px; /* rim width set to 0 to disable edge */
+  }
+  html,body{height:100%;margin:0}
+  body{
+    font-family:system-ui,Segoe UI,Roboto,Arial;
+    background:linear-gradient(150deg,var(--bg1) 0%, #1f9a4f 40%, var(--bg2) 70%);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:calc(18px * var(--scale));
+    box-sizing:border-box;
+    overflow:hidden;
+  }
+
+  /* Prevent any accidental text selection while interacting with the game (drag/drop) */
+  body, .app, .panel-backdrop, #board, .cell, .pawn, .emoji-option, .emoji-chooser-title, #status, .victory-card {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  /* Allow text selection in inputs explicitly (team name inputs) */
+  input, textarea, .team-name-input {
+    -webkit-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+  }
+
+  .app { width:100%; max-width:calc(820px * var(--scale)); display:flex; flex-direction:column; align-items:center; gap:calc(12px * var(--scale)); position:relative; z-index:2; }
+  header{display:flex;flex-direction:column;align-items:center;gap:calc(8px * var(--scale));width:100%}
+  .titleRow {display:flex;align-items:center;gap:calc(12px * var(--scale))}
+  h1{margin:0;font-size:calc(20px * var(--scale))}
+  .vbadge{background:linear-gradient(90deg,#fff6e0,#ffe2a6);color:#6b3f00;padding:calc(6px * var(--scale)) calc(10px * var(--scale));border-radius:999px;font-weight:700;font-size:calc(13px * var(--scale))}
+
+  .panel-backdrop { width:100%; background: rgba(0,0,0,0.10); border-radius:calc(12px * var(--scale)); padding:calc(14px * var(--scale)); box-shadow: 0 12px 38px rgba(0,0,0,0.14); backdrop-filter: blur(5px); display:flex; flex-direction:column; align-items:center; gap:calc(12px * var(--scale)); }
+
+  #controls{display:flex;flex-wrap:wrap;gap:calc(8px * var(--scale));justify-content:center;width:100%}
+  /* Group for primary actions (New / Reset) to match UI theming */
+  .primary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  /* keep layout consistent on narrow viewports */
+  @media (max-width:520px){ .primary-actions{ width:100%; justify-content:center } }
+  /* secondary group for undo/redo buttons — match primary-actions styling */
+  .secondary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .secondary-actions{ width:100%; justify-content:center } }
+  /* tertiary group for AI / Theme / Rules buttons — match primary-actions styling */
+  .tertiary-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .tertiary-actions{ width:100%; justify-content:center } }
+  /* separate group just for Rules / Credits to match themed boxes */
+  .rules-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .rules-actions{ width:100%; justify-content:center } }
+  button{
+    padding:calc(8px * var(--scale)) calc(12px * var(--scale));
+    border-radius:calc(8px * var(--scale));
+    border:1px solid rgba(255,255,255,0.18); /* white border */
+    background:rgba(255,255,255,0.06);
+    color:#fff;
+    cursor:pointer;
+    font-size:calc(13px * var(--scale));
+    font-weight:700; /* bold button text */
+    transition: background 120ms ease, box-shadow 140ms ease, transform 120ms ease;
+  }
+  button:hover{ background: rgba(255,255,255,0.10); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
+  button:focus{ outline: none; box-shadow: 0 0 0 3px rgba(255,255,255,0.06); }
+  button:disabled{ opacity:.45; cursor:not-allowed; filter: grayscale(0.2); }
+
+  /* Toggle button styling: match the other buttons exactly for color/appearance */
+  .toggle-btn{ padding-left: calc(12px * var(--scale)); padding-right: calc(12px * var(--scale)); display:inline-flex; align-items:center; gap:8px; 
+    /* match base button colors */
+    background: rgba(255,255,255,0.06); color: #fff; border: 1px solid rgba(255,255,255,0.18);
+  }
+  .toggle-btn.toggle-on, .toggle-btn.toggle-off { /* keep visual identical to other buttons */ background: rgba(255,255,255,0.06); color:#fff; border:1px solid rgba(255,255,255,0.18); }
+
+  /* Allow visual overflow for tile shadows, specular streaks and particle effects
+    so bottom tiles aren't clipped. Add a little bottom padding to provide breathing room. */
+  #boardWrap{display:flex;justify-content:center;width:100%;position:relative;overflow:visible;padding-bottom:calc(8px * var(--scale));}
+  #board{display:grid;grid-template-columns:repeat(5,var(--tile));grid-gap:calc(6px * var(--scale));margin:0 auto;position:relative;z-index:3}
+  .cell{
+    width:var(--tile);
+    height:var(--tile);
+    display:flex;align-items:center;justify-content:center;
+    border-radius:calc(8px * var(--scale));
+    cursor:pointer;
+    /* subtle outer edge and inner bevel for embossed look */
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.12),
+                inset 0 calc(-6px * var(--scale)) calc(12px * var(--scale)) rgba(255,255,255,0.02),
+                /* subtle gold rim (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+    transition: transform 120ms ease, box-shadow 160ms ease;
+    position:relative; overflow:visible;
+  }
+
+  .white{
+    background: var(--tile-white-top);
+    color:#111;
+    border: 1px solid rgba(0,0,0,1);
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.08),
+                inset 0 6px 12px rgba(255,255,255,0.7),
+                inset 0 -6px 10px rgba(0,0,0,0.04),
+                /* green edge (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+  }
+
+  .black{
+    background: var(--tile-black-top);
+    color:#fff;
+    border: 1px solid rgba(255,255,255,1);
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.18),
+                inset 0 6px 10px rgba(255,255,255,0.04),
+                inset 0 -6px 12px rgba(0,0,0,0.45),
+                /* green edge (opaque) */
+                0 0 0 var(--tile-gold-width) var(--tile-gold-edge);
+  }
+
+  /* Hover/active states to emphasize shiny rim (green theme) */
+  .cell:hover{
+    /* do not change tile position on hover; only accentuate the rim */
+    box-shadow: 0 calc(10px * var(--scale)) calc(28px * var(--scale)) rgba(0,0,0,0.18),
+                inset 0 calc(-6px * var(--scale)) calc(12px * var(--scale)) rgba(255,255,255,0.02),
+                0 0 0 calc(var(--tile-gold-width) * 1.6) var(--tile-gold-edge), /* stronger opaque rim */
+                0 10px 36px var(--tile-gold-glow);
+  }
+
+  .cell:active{
+    /* keep tile position stable on active press; boost rim */
+    box-shadow: 0 calc(6px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.14),
+                inset 0 2px 8px rgba(0,0,0,0.06),
+                0 0 0 calc(var(--tile-gold-width) * 1.2) var(--tile-gold-edge);
+  }
+  /* Tile specular streaks removed per user request */
+  .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
+  .captured-red{background:#ff6b6b}.captured-blue{background:#6bb2ff}
+
+  .pawn{
+    position: relative;
+    display: inline-flex;
+    font-size: calc(36px * var(--scale));
+    line-height: 1;
+    width: calc(40px * var(--scale));
+    height: calc(40px * var(--scale));
+    align-items:center; justify-content:center;
+    border-radius:50%;
+    cursor:grab;
+    user-select:none;
+    box-shadow: 0 calc(10px * var(--scale)) calc(26px * var(--scale)) rgba(0,0,0,0.48), inset 0 calc(-2px * var(--scale)) calc(6px * var(--scale)) rgba(255,255,255,0.02);
+    filter: drop-shadow(0 calc(8px * var(--scale)) calc(14px * var(--scale)) rgba(0,0,0,0.30));
+    transition: transform 160ms ease, box-shadow 160ms ease, opacity 120ms ease;
+    transform-origin: center;
+    z-index: 30;
+    touch-action: none;
+  }
+  .pawn .pface { position: relative; z-index: 31; pointer-events: none; display: inline-block; line-height:1; }
+
+  @keyframes pawnIdleSquashWiggle {
+    0%   { transform: translateZ(0) translateX(0) rotate(0deg) scaleX(1)   scaleY(1); }
+    12%  { transform: translateZ(0) translateX(-1px) rotate(-1.2deg) scaleX(1.03) scaleY(0.97); }
+    25%  { transform: translateZ(0) translateX(1px)  rotate(1.1deg)  scaleX(1.04) scaleY(0.96); }
+    37%  { transform: translateZ(0) translateX(-0.6px) rotate(-0.6deg) scaleX(1.01) scaleY(0.99); }
+    50%  { transform: translateY(-3px) translateX(0) rotate(0deg)       scaleX(0.98) scaleY(1.04); }
+    62%  { transform: translateZ(0) translateX(0.6px) rotate(0.6deg)   scaleX(1.02) scaleY(0.98); }
+    75%  { transform: translateZ(0) translateX(-1px) rotate(-1deg)    scaleX(1.02) scaleY(0.98); }
+    88%  { transform: translateZ(0) translateX(0.4px) rotate(0.5deg)   scaleX(1.01) scaleY(0.99); }
+    100% { transform: translateZ(0) translateX(0) rotate(0deg)         scaleX(1)   scaleY(1); }
+  }
+  .pawn.idle { animation: pawnIdleSquashWiggle 2400ms cubic-bezier(.2,.7,.2,1) infinite; will-change: transform; }
+
+  .pawn::before{
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%,-50%) scale(1);
+    width: calc(52px * var(--scale));
+    height: calc(52px * var(--scale));
+    border-radius: 50%;
+    z-index: 10; 
+    opacity: 1;
+    transition: opacity 100ms linear, transform 120ms ease, box-shadow 120ms ease;
+    pointer-events: none;
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.02);
+    background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(255,120,120,0.98) 36%, rgba(255,80,80,0.75) 62%, rgba(255,60,60,0.45) 78%, rgba(255,60,60,0.12) 92%);
+    mix-blend-mode: screen;
+    filter: saturate(1.25) contrast(1.2);
+    animation: pawnHighlightPulse 1400ms ease-in-out infinite;
+  }
+
+  .pawn::after{
+    content: "";
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform: translate(-50%,-50%) scale(1);
+    width: calc(72px * var(--scale));
+    height: calc(72px * var(--scale));
+    border-radius:50%;
+    z-index: 8;
+    opacity: 0.85;
+    pointer-events:none;
+    filter: blur(calc(6px * var(--scale))) saturate(1.25);
+    background: radial-gradient(circle, rgba(255,120,120,0.75), transparent 42%);
+    mix-blend-mode: screen;
+    transition: opacity 120ms ease, transform 120ms ease;
+    animation: pawnGlowBreath 1600ms ease-in-out infinite;
+  }
+
+  .pawn[data-color="red"]::before{ background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(255,110,110,0.98) 36%, rgba(255,60,60,0.90) 62%, rgba(220,40,40,0.75) 78%, rgba(180,30,30,0.20) 92%); }
+  .pawn[data-color="red"]::after{ background: radial-gradient(circle, rgba(255,90,90,0.92), transparent 42%); }
+  .pawn[data-color="blue"]::before{ background: radial-gradient(circle at 50% 48%, rgba(255,255,255,0.98) 0%, rgba(140,200,255,0.98) 36%, rgba(80,150,255,0.90) 62%, rgba(40,120,255,0.75) 78%, rgba(20,90,200,0.20) 92%); }
+  .pawn[data-color="blue"]::after{ background: radial-gradient(circle, rgba(100,170,255,0.92), transparent 42%); }
+
+  .explosion { position: absolute; transform: translate(-50%, -50%); pointer-events: none; width: calc(260px * var(--scale)); height: calc(260px * var(--scale)); z-index: 18; }
+  .explosion .ring { position: absolute; left:50%; top:50%; width:calc(40px * var(--scale)); height:calc(40px * var(--scale)); border-radius:50%; transform:translate(-50%,-50%) scale(0.3); border:calc(7px * var(--scale)) solid rgba(255,230,150,0.98); animation: ringPop 560ms cubic-bezier(.1,.9,.2,1) forwards; }
+  @keyframes ringPop { to { transform: translate(-50%,-50%) scale(6.0); opacity: 0; } }
+  .explosion .flash { position:absolute; left:50%; top:50%; width:calc(100px * var(--scale)); height:calc(100px * var(--scale)); transform:translate(-50%,-50%) scale(0.6); background: radial-gradient(circle at 50% 40%, rgba(255,255,255,0.98), rgba(255,220,120,0.95) 50%, transparent 70%); border-radius:50%; opacity:0.98; animation: flashPop 280ms cubic-bezier(.2,.9,.3,1) forwards; mix-blend-mode:screen; }
+  @keyframes flashPop { to { transform: translate(-50%,-50%) scale(2.6); opacity:0; } }
+  .explosion .shock { position:absolute; left:50%; top:50%; width:calc(160px * var(--scale)); height:calc(160px * var(--scale)); transform:translate(-50%,-50%) scale(0.2); border-radius:50%; background: radial-gradient(circle, rgba(255,240,160,0.12), rgba(255,160,60,0.06) 45%, transparent 60%); opacity:0.9; animation: shockPop 560ms cubic-bezier(.1,.9,.2,1) forwards; mix-blend-mode:screen; }
+  @keyframes shockPop { to { transform: translate(-50%,-50%) scale(3.2); opacity: 0; } }
+  .explosion .particle { position:absolute; left:50%; top:50%; width:calc(14px * var(--scale)); height:calc(14px * var(--scale)); border-radius:50%; opacity:1; transform-origin:center; animation: particleFly 760ms cubic-bezier(.12,.85,.28,1) forwards; box-shadow:0 calc(6px * var(--scale)) calc(18px * var(--scale)) rgba(0,0,0,0.32); background: radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b; }
+  @keyframes particleFly { to { transform: translate(var(--tx), var(--ty)) scale(0.36); opacity: 0; filter: blur(0.8px); } }
+  /* Movement trails (larger, brighter, longer-lived) */
+  .trail { position: absolute; pointer-events: none; width: calc(140px * var(--scale)); height: calc(64px * var(--scale)); transform: translate(-50%, -50%); border-radius: calc(20px * var(--scale)); z-index: 16; overflow: visible; }
+
+  /* Fire trail — bigger flames, longer rise */
+  /* particles use a consistent base size so red and blue trails match visually */
+  .trail { --trail-px: calc(18px * var(--scale)); --trail-w: calc(140px * var(--scale)); --trail-h: calc(64px * var(--scale)); }
+  .trail { width: var(--trail-w); height: var(--trail-h); }
+  /* apply base particle styling to both flame and spark elements */
+  .trail .flame, .trail .spark { position: absolute; width: var(--trail-px); height: var(--trail-px); border-radius: 50%; transform: translate(-50%,-50%) scale(1); filter: blur(calc(1.6px * var(--scale))); mix-blend-mode: normal; opacity:0.98; }
+  .trail-fire .flame:nth-child(1){ background: radial-gradient(circle at 40% 30%, rgba(255,240,180,1), rgba(255,140,60,0.98) 36%, rgba(230,80,40,0.94) 62%, rgba(200,40,30,0.85) 78%, transparent 92%); left:36%; top:66%; }
+  .trail-fire .flame:nth-child(2){ background: radial-gradient(circle at 40% 30%, rgba(255,220,160,0.96), rgba(255,120,40,0.94) 36%, rgba(220,60,30,0.86) 58%, transparent 90%); left:64%; top:56%; }
+  .trail-fire .flame:nth-child(3){ background: radial-gradient(circle at 40% 30%, rgba(255,200,140,0.94), rgba(255,110,40,0.92) 36%, rgba(210,60,30,0.84) 58%, transparent 90%); left:50%; top:60%; }
+  .trail-fire .flame{ animation: trailFireRise 1600ms cubic-bezier(.2,.8,.2,1) forwards; }
+  .trail-fire .flame:nth-child(4){ background: radial-gradient(circle at 40% 30%, rgba(255,230,150,0.94), rgba(255,130,50,0.9) 36%, rgba(220,70,40,0.82) 58%, transparent 90%); left:58%; top:68%; animation-delay:160ms; }
+  @keyframes trailFireRise { to { transform: translate(-50%,-220%) scale(0.5); opacity: 0; } }
+
+  /* Sparkle trail — stronger glow, longer life, particles match red size */
+  /* spark-specific coloring and positions handled per nth-child below */
+  .trail-sparkle .spark:nth-child(1){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,1) 0%, rgba(150,220,255,0.98) 30%, rgba(70,170,255,0.94) 56%, rgba(30,120,220,0.86) 78%, rgba(20,90,180,0.6) 92%); left:50%; top:50%; box-shadow: 0 0 calc(12px * var(--scale)) rgba(80,170,255,0.44), 0 0 calc(4px * var(--scale)) rgba(255,255,255,0.65); }
+  .trail-sparkle .spark:nth-child(2){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.98), rgba(160,230,255,0.96) 30%, rgba(100,190,255,0.92) 58%, rgba(40,140,220,0.8) 82%); left:72%; top:42%; }
+  .trail-sparkle .spark:nth-child(3){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.96), rgba(140,210,255,0.95) 30%, rgba(80,170,255,0.9) 58%, rgba(30,120,220,0.76) 82%); left:38%; top:58%; }
+  .trail-sparkle .spark{ animation: trailSparkle 1400ms cubic-bezier(.2,.8,.2,1) forwards; }
+  .trail-sparkle .spark:nth-child(4){ background: radial-gradient(circle at 40% 30%, rgba(255,255,255,0.96), rgba(160,225,255,0.96) 30%, rgba(90,180,255,0.92) 58%, rgba(40,140,220,0.8) 82%); left:58%; top:38%; animation-delay:160ms; }
+  @keyframes trailSparkle { to { transform: translate(-50%,-90%) scale(0.4); opacity: 0; } }
+
+  #status{min-height:20px;font-size:calc(14px * var(--scale));text-align:center}
+  .small{font-size:calc(12px * var(--scale));opacity:0.9;text-align:center}
+
+  .flower-field { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+  .flower { position: absolute; opacity: var(--opa,0.22); transform-origin: center; will-change: transform, opacity; animation: flowerFloat var(--dur) linear infinite; user-select: none; font-family: serif; }
+  @keyframes flowerFloat { 0% { transform: translateY(0) rotate(0deg) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } 50% { transform: translateY(-8px) rotate(var(--rot,0deg)) scale(calc(var(--scaleF,1) * 1.03)); opacity: calc(var(--opa,0.22) + 0.06); } 100% { transform: translateY(0) rotate(calc(var(--rot,0deg) * -1)) scale(var(--scaleF,1)); opacity: var(--opa,0.22); } }
+  /* When paused (tab hidden or modal open) stop flower animations to save CPU */
+  .flower-field.paused .flower { animation-play-state: paused !important; opacity: 0.18; }
+
+  @media (max-width:520px){
+    :root{--scale:1; --tile:48px}
+    h1{font-size:18px}
+    .panel-backdrop{padding:10px}
+    button{padding:7px 10px}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .pawn.idle { animation: none; transform: none; }
+    .pawn::before, .pawn::after, .pawn:hover::before, .pawn:hover::after { animation: none; transition: none; filter: none; mix-blend-mode: normal; }
+  }
+
+  /* Victory overlay */
+  .victory-overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,6,6,0.6); z-index:9999; opacity:0; pointer-events:none; transition:opacity 220ms ease; }
+  .victory-overlay.show{ opacity:1; pointer-events:auto; }
+  .victory-card{ background:linear-gradient(180deg,#111 0%, #1b1b1b 100%); color:#fff; padding:calc(22px * var(--scale)); border-radius:12px; box-shadow:0 18px 60px rgba(0,0,0,0.6); text-align:center; width: min(640px, calc(92%)); }
+  .victory-card h2{ margin:0 0 calc(8px * var(--scale)) 0; font-size:calc(22px * var(--scale)); }
+  .victory-card p{ margin:0 0 calc(14px * var(--scale)) 0; font-size:calc(16px * var(--scale)); opacity:0.95 }
+  .victory-actions{ display:flex; gap:calc(10px * var(--scale)); justify-content:center; margin-top:calc(12px * var(--scale)); }
+  .victory-emoji{ font-size:calc(54px * var(--scale)); margin-bottom:calc(6px * var(--scale)); display:block }
+</style>
+</head>
+<body>
+  <div class="flower-field" id="flowerField" aria-hidden="true"></div>
+
+  <div class="app" role="application" aria-label="Attack-Tac-Toe">
+    <div class="panel-backdrop">
+      <header>
+        <div class="titleRow">
+          <h1>Attack-Tac-Toe</h1>
+          <div class="vbadge">v005.1</div>
+        </div>
+        <div id="status" class="small" aria-live="polite"></div>
+      </header>
+
+      <div id="boardWrap"><div id="board" role="grid" aria-label="game board"></div></div>
+  <div id="controls" style="margin-top:calc(8px * var(--scale));display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center">
+        <div class="primary-actions" aria-hidden="false">
+          <button id="newBtn">New</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+        <div class="secondary-actions" aria-hidden="false">
+          <button id="undoBtn" disabled>Undo</button>
+          <button id="redoBtn" disabled>Redo</button>
+        </div>
+        <div class="tertiary-actions" aria-hidden="false">
+          <button id="aiToggleBtn">Play vs AI</button>
+          <button id="themeBtn">Theme</button>
+        </div>
+        <div class="rules-actions" aria-hidden="false">
+          <button id="rulesBtn">Rules</button>
+          <button id="creditsBtn">Credits</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="victoryOverlay" class="victory-overlay" aria-hidden="true">
+    <div class="victory-card" role="dialog" aria-modal="true">
+      <span id="victoryEmoji" class="victory-emoji">🏆</span>
+      <h2 id="victoryTitle">Victory!</h2>
+      <p id="victoryText">Player wins the game.</p>
+      <div class="victory-actions">
+        <button id="victoryRestart">Play Again</button>
+        <button id="victoryClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* Project Elmo 004.7 — full script with swipe, chain rules, double-step first move */
+
+// DOM refs
+const board = document.getElementById('board');
+const boardWrap = document.getElementById('boardWrap');
+const status = document.getElementById('status');
+const resetBtn = document.getElementById('resetBtn');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+
+let currentPlayer = 'red';
+let dragged = null;
+let chainMode = false;
+let chainPawn = null;
+let chainCount = 0;
+let chainPrevIdx = null; // index the chain pawn came from (allow stepping back)
+let chainAllowLastMove = false; // when true, allow one final non-capture decision at end of a chain
+let scores = { red:0, blue:0 };
+
+const MAX_PAWNS_PER_PLAYER = 5;
+
+// AI settings
+let aiEnabled = true;             // toggle whether AI takes turns (ON by default)
+let aiColor = 'blue';            // which color the AI will play
+let _aiTimer = null;             // scheduled timer id for AI thinking
+let _aiSession = 0;              // incrementing token to invalidate pending AI work during undos
+
+
+const undoStack = [];
+const redoStack = [];
+let suppressSnapshots = false;
+// timer used to delay resuming the AI after user-initiated undo/redo actions.
+// This lets the user press Undo multiple times quickly without the AI intervening.
+let _undoAiResumeTimer = null;
+
+const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function enableIdleAfterFrame(el){ if(prefersReducedMotion) return; el.style.transform = ''; requestAnimationFrame(()=> requestAnimationFrame(()=> { if(document.contains(el)) el.classList.add('idle'); })); }
+function clamp(v, min, max){ return Math.max(min, Math.min(max, v)); }
+function isDiagonal(dx, dy){ return dx === 1 && dy === 1; }
+
+// Swipe helpers
+const SWIPE_MIN_DIST = 24;
+const SWIPE_MAX_TIME = 450;
+const SWIPE_ANGLE_TOL = 45;
+function angleDeg(dx, dy){ return Math.atan2(dy, dx) * 180 / Math.PI; }
+function angleToCellDelta(dxPx, dyPx){
+  const angle = angleDeg(dxPx, dyPx);
+  const dirs = [
+    {ang: -135, d:[-1,-1]}, {ang: -90, d:[0,-1]}, {ang: -45, d:[1,-1]},
+    {ang: 180, d:[-1,0]},                   {ang: 0, d:[1,0]},
+    {ang: 135, d:[-1,1]},  {ang: 90, d:[0,1]},  {ang: 45, d:[1,1]}
+  ];
+  let best = dirs[0], bestDiff = 360;
+  for(const cand of dirs){
+    let diff = Math.abs(((angle - cand.ang + 540) % 360) - 180);
+    if(diff < bestDiff){ bestDiff = diff; best = cand; }
+  }
+  if(bestDiff > SWIPE_ANGLE_TOL) return null;
+  return { dx: best.d[0], dy: best.d[1] };
+}
+
+// Audio & effects (unchanged)
+let audioCtx = null;
+function ensureAudioContext(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+function playCaptureMelody(level = 1, dest = null){ try { ensureAudioContext(); if (audioCtx.state === 'suspended') audioCtx.resume().catch(()=>{}); const now = audioCtx.currentTime; const out = dest || audioCtx.destination; const baseFreq = 440; const seq = [0, 3, 7, 12]; const tempo = 0.12; const gainMaster = audioCtx.createGain(); gainMaster.gain.value = 0.12 * Math.min(1.6, 0.6 + 0.12 * level); gainMaster.connect(out); seq.forEach((semi, i) => { const t = now + i * tempo * (0.95 + Math.random() * 0.06); const freq = baseFreq * Math.pow(2, (semi + (level-1)*1.2) / 12); const osc = audioCtx.createOscillator(); const osc2 = audioCtx.createOscillator(); const g = audioCtx.createGain(); const filt = audioCtx.createBiquadFilter(); osc.type = 'sine'; osc2.type = 'triangle'; osc.frequency.setValueAtTime(freq * (0.98 + Math.random() * 0.02), t); osc2.frequency.setValueAtTime(freq * 1.98, t); g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(1.0 * (0.12 + level * 0.02), t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + tempo * 0.92); filt.type = 'highpass'; filt.frequency.value = 120 + level * 10; osc.connect(filt); osc2.connect(filt); filt.connect(g); g.connect(gainMaster); osc.start(t); osc.stop(t + tempo * 0.95); osc2.start(t); osc2.stop(t + tempo * 0.95); }); } catch (e) { console.warn('Audio error', e); } }
+// ----------------------
+// AI move logic
+// ----------------------
+function aiTakeTurn(session){
+  // session token guards: if the global session has changed since this
+  // aiTurn was scheduled, abort to avoid acting on stale state.
+  if(typeof session !== 'number' || session !== _aiSession) return;
+  if(!aiEnabled) return;
+  if(currentPlayer !== aiColor) return;
+  // small randomized thinking delay to feel natural
+  const thinkDelay = 260 + Math.floor(Math.random() * 320);
+  const localSession = session;
+  setTimeout(()=>{
+    // if session invalidated while thinking, abort
+    if(localSession !== _aiSession) return;
+    (function(){
+      try{
+        // 1) If chain mode is active and chainPawn exists, continue capturing from it
+        if(chainMode && chainPawn && chainPawn.dataset.color === aiColor){
+          const caps = availableDiagonalCapturesFromCell(chainPawn.parentElement);
+          if(caps && caps.length > 0){
+            const target = caps[Math.floor(Math.random() * caps.length)];
+            dragged = chainPawn;
+            try{ handleDrop(new Event('ai-capture'), target.cell); }catch(e){ console.warn('AI capture drop failed', e); }
+            return;
+          }
+          // If there are no immediate captures from the chain pawn, the AI
+          // must not move other pieces — it may only use the one-time final
+          // non-capture move (chainAllowLastMove) with the same pawn. Find a
+          // legal non-capture move for the chain pawn only and perform it.
+          if(chainAllowLastMove){
+            try{
+              const fromCell = chainPawn.parentElement;
+              if(fromCell){
+                const fromIdx = Number(fromCell.dataset.index);
+                const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+                const candidates = [];
+                for(let nx = fx-1; nx <= fx+1; nx++){
+                  for(let ny = fy-1; ny <= fy+1; ny++){
+                    if(nx < 0 || nx >= 5 || ny < 0 || ny >= 5) continue;
+                    const toIdx = ny * 5 + nx; if(toIdx === fromIdx) continue;
+                    const dest = board.children[toIdx]; if(!dest) continue;
+                    if(dest.querySelector('.pawn')) continue; // must be empty
+                    const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+                    // apply same chain diagonal allowance used for player swipes
+                    if(isDiagonal(dx, dy)){
+                      const adj1 = board.children[fy * 5 + nx];
+                      const adj2 = board.children[ny * 5 + fx];
+                      const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+                      const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+                      if(toIdx !== chainPrevIdx && !(adj1Empty || adj2Empty)) continue;
+                    }
+                    if(isValidMove(dx, dy) || canDoubleStep(chainPawn, fromIdx, toIdx)){
+                      candidates.push(dest);
+                    }
+                  }
+                }
+                if(candidates.length > 0){
+                  const choice = candidates[Math.floor(Math.random() * candidates.length)];
+                  dragged = chainPawn;
+                  try{ handleDrop(new Event('ai-move'), choice); }catch(e){ console.warn('AI chain final move failed', e); }
+                }
+              }
+            }catch(e){ console.warn('AI chain final-move error', e); }
+          }
+          // Whether we moved or not, do not allow the AI to act with other pawns while chainMode persists
+          return;
+        }
+
+        // 2) Search for any capturing moves for the AI
+        const captureMoves = [];
+        for(let i=0;i<25;i++){
+          const cell = board.children[i]; if(!cell) continue;
+          const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
+          const caps = availableDiagonalCapturesFromCell(cell);
+          if(caps && caps.length > 0){
+            captureMoves.push({ pawn: p, from: cell, caps });
+          }
+        }
+        if(captureMoves.length > 0){
+          // prefer captures that lead to further captures (simple lookahead)
+          let chosen = null;
+          for(const cand of captureMoves){
+            for(const c of cand.caps){
+              const tmpPawn = cand.pawn; const targetCell = c.cell;
+              const further = availableDiagonalCapturesFromCell(targetCell);
+              if(further && further.length > 0){ chosen = { pawn: tmpPawn, target: targetCell }; break; }
+            }
+            if(chosen) break;
+          }
+          if(!chosen){
+            const group = captureMoves[Math.floor(Math.random() * captureMoves.length)];
+            const cap = group.caps[Math.floor(Math.random() * group.caps.length)];
+            chosen = { pawn: group.pawn, target: cap.cell };
+          }
+          if(chosen){ dragged = chosen.pawn; try{ handleDrop(new Event('ai-capture'), chosen.target); }catch(e){ console.warn('AI handleDrop failed', e); } }
+          return;
+        }
+
+        // 3) If AI has fewer than max pawns, randomly choose to spawn or move
+        const homeRow = aiColor === 'red' ? 4 : 0;
+        const canSpawn = countPawns(aiColor) < MAX_PAWNS_PER_PLAYER;
+        const spawnCandidates = [];
+        if(canSpawn) {
+          for(let c=0;c<5;c++){
+            const idx = homeRow*5 + c; const cell = board.children[idx]; if(cell && !cell.querySelector('.pawn')) spawnCandidates.push(cell);
+          }
+        }
+        const possibleMoves = [];
+        for(let i=0;i<25;i++){
+          const cell = board.children[i]; if(!cell) continue;
+          const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
+          const fromIdx = i; const fx = fromIdx % 5; const fy = Math.floor(fromIdx/5);
+          for(let nx = fx-1; nx <= fx+1; nx++){
+            for(let ny = fy-1; ny <= fy+1; ny++){
+              if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
+              const toIdx = ny*5 + nx; if(toIdx === fromIdx) continue;
+              const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+              const dest = board.children[toIdx]; if(!dest) continue;
+              if(dest.querySelector('.pawn')) continue;
+              if(isValidMove(dx,dy)){
+                possibleMoves.push({ pawn: p, from: cell, to: dest });
+              }
+            }
+          }
+          if(p.dataset.moved !== 'true') {
+            let doubleStepIdx = null;
+            if(p.dataset.color === 'red') {
+              if(fy >= 2) doubleStepIdx = (fy-2)*5 + fx;
+            } else {
+              if(fy <= 2) doubleStepIdx = (fy+2)*5 + fx;
+            }
+            if(doubleStepIdx !== null) {
+              const dest = board.children[doubleStepIdx];
+              if(dest && !dest.querySelector('.pawn') && canDoubleStep(p, fromIdx, doubleStepIdx)) {
+                possibleMoves.push({ pawn: p, from: cell, to: dest });
+              }
+            }
+          }
+        }
+        if(canSpawn && spawnCandidates.length > 0 && (possibleMoves.length === 0 || Math.random() < 0.5)) {
+          const choice = spawnCandidates[Math.floor(Math.random() * spawnCandidates.length)];
+          try{ onCellClick(choice); }catch(e){ console.warn('AI place failed', e); }
+          return;
+        }
+        if(possibleMoves.length > 0){
+          const mv = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
+          dragged = mv.pawn;
+          try{ handleDrop(new Event('ai-move'), mv.to); }catch(e){ console.warn('AI move failed', e); }
+          return;
+        }
+
+        // nothing to do — pass
+      }catch(e){ console.warn('AI unexpected error', e); }
+    })();
+  // AI has finished its decision (or passed). No special undo-block state is used now.
+  }, thinkDelay);
+}
+
+function playPlacementSound(){ try{ ensureAudioContext(); const now = audioCtx.currentTime; const gain = audioCtx.createGain(); gain.gain.value = 0.08; gain.connect(audioCtx.destination); const osc = audioCtx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(660, now); osc.frequency.exponentialRampToValueAtTime(880, now + 0.09); const env = audioCtx.createGain(); env.gain.setValueAtTime(0.0001, now); env.gain.linearRampToValueAtTime(1.0, now + 0.008); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.16); osc.connect(env); env.connect(gain); osc.start(now); osc.stop(now + 0.18); }catch(e){} }
+
+// Theme removed: background music and related helpers were removed per request.
+
+// toggle handler wired at end of file
+
+function showPlacementEffect(cellElem){
+  if(!cellElem) return;
+  cellElem.style.transition = 'transform 140ms ease, box-shadow 140ms ease';
+  cellElem.style.transform = 'scale(1.06)';
+  setTimeout(()=> { cellElem.style.transform = ''; }, 140);
+
+  const wrap = boardWrap;
+  const rect = cellElem.getBoundingClientRect();
+  const wrapRect = wrap.getBoundingClientRect();
+  let px = rect.left + rect.width/2 - wrapRect.left;
+  let py = rect.top + rect.height/2 - wrapRect.top;
+  const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
+  const margin = Math.max(6, 6 * scale);
+  px = clamp(px, margin, wrapRect.width - margin);
+  py = clamp(py, margin, wrapRect.height - margin);
+
+  const pop = document.createElement('div');
+  pop.className = 'placement-pop';
+  pop.style.position = 'absolute';
+  pop.style.left = px + 'px';
+  pop.style.top = py + 'px';
+  pop.style.width = '8px';
+  pop.style.height = '8px';
+  pop.style.borderRadius = '50%';
+  pop.style.pointerEvents = 'none';
+  pop.style.transform = 'translate(-50%,-50%) scale(0.2)';
+  pop.style.background = 'rgba(255,255,255,0.95)';
+  pop.style.boxShadow = '0 4px 12px rgba(0,0,0,0.28)';
+  pop.style.zIndex = 8;
+  pop.style.transition = 'transform 360ms cubic-bezier(.2,.9,.3,1), opacity 360ms ease';
+  boardWrap.appendChild(pop);
+  requestAnimationFrame(()=> {
+    pop.style.transform = 'translate(-50%,-50%) scale(1.6)';
+    pop.style.opacity = '0';
+  });
+  setTimeout(()=> pop.remove(), 420);
+}
+
+function showExplosionAtCell(cellElem, color = 'orange') {
+  if (!cellElem || !boardWrap) return;
+  const cellRect = cellElem.getBoundingClientRect();
+  const wrapRect = boardWrap.getBoundingClientRect();
+  let cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
+  let cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
+  const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
+  const margin = Math.max(12, 12 * scale);
+  cx = clamp(cx, margin, wrapRect.width - margin);
+  cy = clamp(cy, margin, wrapRect.height - margin);
+
+  const expl = document.createElement('div');
+  expl.className = 'explosion';
+  expl.style.position = 'absolute';
+  expl.style.left = cx + 'px';
+  expl.style.top = cy + 'px';
+  expl.style.pointerEvents = 'none';
+  expl.style.zIndex = 18;
+
+  const ring = document.createElement('div');
+  ring.className = 'ring';
+  ring.style.borderColor = color === 'red' ? 'rgba(255,140,140,0.98)' : 'rgba(140,200,255,0.98)';
+  expl.appendChild(ring);
+
+  const flash = document.createElement('div');
+  flash.className = 'flash';
+  expl.appendChild(flash);
+
+  const shock = document.createElement('div');
+  shock.className = 'shock';
+  expl.appendChild(shock);
+
+  const total = 20;
+  for (let i = 0; i < total; i++) {
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const angle = (i / total) * Math.PI * 2 + (Math.random() - 0.5) * 0.9;
+    const dist = (50 + Math.random() * 90) * scale;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist;
+    p.style.setProperty('--tx', tx + 'px');
+    p.style.setProperty('--ty', ty + 'px');
+    p.style.width = (8 + Math.random() * 14) + 'px';
+    p.style.height = p.style.width;
+    p.style.animationDelay = (Math.random() * 120) + 'ms';
+    p.style.background = (i % 3 === 0)
+      ? 'radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ff9f6b'
+      : 'radial-gradient(circle at 30% 30%, #fff, transparent 55%), #ffd26b';
+    expl.appendChild(p);
+  }
+
+  boardWrap.appendChild(expl);
+  setTimeout(() => expl.remove(), 1000);
+}
+
+// show a short-lived trail at the given cell; color is 'red' or 'blue'
+function showTrailAtCell(cellElem, color, destCell){
+  if(!cellElem || !boardWrap) return;
+  try{
+    const cellRect = cellElem.getBoundingClientRect();
+    const wrapRect = boardWrap.getBoundingClientRect();
+    let cx = cellRect.left + cellRect.width / 2 - wrapRect.left;
+    let cy = cellRect.top + cellRect.height / 2 - wrapRect.top;
+    // compute angle towards destCell if provided so the trail orients along movement
+    let angle = 0;
+    let useMidpoint = false;
+    let midX = cx, midY = cy, span = null;
+    if(destCell && destCell !== cellElem){
+      try{
+        const dRect = destCell.getBoundingClientRect();
+        const origCx = cellRect.left + cellRect.width/2 - wrapRect.left;
+        const origCy = cellRect.top + cellRect.height/2 - wrapRect.top;
+        const destCx = dRect.left + dRect.width/2 - wrapRect.left;
+        const destCy = dRect.top + dRect.height/2 - wrapRect.top;
+        const dx = destCx - origCx;
+        const dy = destCy - origCy;
+        angle = Math.atan2(dy, dx) * 180 / Math.PI;
+        // midpoint between origin and dest (in wrap coords)
+        midX = origCx + dx * 0.5;
+        midY = origCy + dy * 0.5;
+        span = Math.hypot(dx, dy);
+        useMidpoint = true;
+      }catch(e){ console.warn('trail calc error', e); }
+    }
+    const scale = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--scale')) || 1;
+    const margin = Math.max(8, 8 * scale);
+  cx = clamp(cx, margin, wrapRect.width - margin);
+  cy = clamp(cy, margin, wrapRect.height - margin);
+  midX = clamp(midX, margin, wrapRect.width - margin);
+  midY = clamp(midY, margin, wrapRect.height - margin);
+
+    const trail = document.createElement('div');
+    trail.className = 'trail ' + (color === 'red' ? 'trail-fire' : 'trail-sparkle');
+    trail.style.position = 'absolute';
+    // position the trail at the midpoint when spanning multiple tiles, otherwise at origin
+    trail.style.left = (useMidpoint ? midX : cx) + 'px';
+    trail.style.top = (useMidpoint ? midY : cy) + 'px';
+    // if we have a span (distance) set the trail width so it stretches between origin and dest
+    if(span){
+      const extra = Math.max(24, 16 * scale);
+      trail.style.width = Math.max(48, span + extra) + 'px';
+      // keep height reasonable
+      trail.style.height = Math.max(28, (24 * scale)) + 'px';
+    }
+    // rotate the whole trail so particle spread follows the movement direction
+    trail.style.transform = `translate(-50%,-50%) rotate(${angle}deg)`;
+    trail.style.zIndex = 16;
+
+    const particleCount = 4; // create same number of particles for both colors
+    for(let i=0;i<particleCount;i++){
+      const el = document.createElement('div');
+      if(color === 'red'){
+        el.className = 'flame';
+      } else {
+        el.className = 'spark';
+      }
+      // stagger slight random delays so particles feel organic
+      const delay = Math.floor(Math.random() * 120);
+      el.style.animationDelay = delay + 'ms';
+      trail.appendChild(el);
+    }
+
+    boardWrap.appendChild(trail);
+    // keep trail visible a bit longer for emphasis (1.8s)
+    setTimeout(()=>{ try{ trail.remove(); }catch(e){} }, 1800);
+  }catch(e){ console.warn('trail error', e); }
+}
+
+// Flowers: single-canvas renderer (less DOM, lower CPU). Draws emoji "flowers" at a capped FPS
+function initFlowers(){
+  const field = document.getElementById('flowerField');
+  if(!field) return;
+
+  // If we've previously created a canvas, clean it up first
+  try{
+    if(field._flowerCleanup){ field._flowerCleanup(); }
+  }catch(e){}
+
+  // clear any existing contents and create a canvas that fills the flower field
+  field.innerHTML = '';
+  const canvas = document.createElement('canvas');
+  canvas.className = 'flower-canvas';
+  canvas.style.position = 'absolute';
+  canvas.style.left = '0';
+  canvas.style.top = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  canvas.style.pointerEvents = 'none';
+  canvas.style.zIndex = 0;
+  field.appendChild(canvas);
+
+  const ctx = canvas.getContext('2d');
+  // allow theme to override flower emojis (e.g., snow theme uses ❄️)
+  const emojis = (window.currentFlowerEmojis && Array.isArray(window.currentFlowerEmojis) && window.currentFlowerEmojis.length) ? window.currentFlowerEmojis : ['🌸','🌼','🌺','🌻','🌷'];
+
+  // Flower data
+  const vw = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+  const vh = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+  // choose a conservative count based on viewport area
+  // double the computed count to increase flower density
+  const count = Math.max(8, Math.round(Math.min(40, (vw * vh) / (1400 * 800) * 12))) * 2;
+  const flowers = [];
+
+  function rand(min, max){ return min + Math.random() * (max - min); }
+
+  function resizeCanvas(){
+    const rect = field.getBoundingClientRect();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    canvas.width = Math.floor(w * dpr);
+    canvas.height = Math.floor(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    // if flowers empty, populate; otherwise, clamp positions inside new size
+    if(flowers.length === 0){
+      for(let i=0;i<count;i++){
+        // make flowers ~10x larger than before and slow their fall dramatically
+        // then apply the user's requested adjustments: reduce size by 30% and halve speed
+  const raw = Math.round(rand(100, 280));
+  // reduce size by 50% per user request (half the previous raw size)
+  const reduced = Math.max(8, Math.round(raw * 0.5));
+        flowers.push({
+          x: rand(0, w),
+          y: rand(0, h),
+          size: reduced,
+          baseSize: reduced,
+          // previous speed was rand(6,28)/1000 (px/ms) after the 10x slowdown
+          // halve that speed per user request => divide by 2000
+          speed: rand(6, 28) / 2000,
+          emoji: emojis[Math.floor(Math.random()*emojis.length)],
+          rot: rand(-0.6,0.6),
+          rotSpeed: rand(-0.0002,0.00036),
+          alpha: rand(0.10, 0.26),
+          floatPhase: Math.random() * Math.PI * 2
+        });
+      }
+    } else {
+      for(const f of flowers){
+        f.x = Math.max(0, Math.min(w, f.x));
+        f.y = Math.max(0, Math.min(h, f.y));
+      }
+    }
+  }
+
+  // Animation control
+  let lastTs = 0;
+  const FPS = 30;
+  const frameInterval = 1000 / FPS;
+  let rafId = null;
+  let pauseTimer = null;
+
+  function drawFrame(ts){
+    // if overlays open or document hidden, pause drawing and poll occasionally
+    if(document.hidden || (typeof isAnyOverlayOpen === 'function' && isAnyOverlayOpen())){
+      if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+      if(pauseTimer) clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(()=>{ pauseTimer = null; rafId = requestAnimationFrame(drawFrame); }, 600);
+      return;
+    }
+
+    if(!lastTs) lastTs = ts;
+    const delta = ts - lastTs;
+    if(delta < frameInterval){
+      rafId = requestAnimationFrame(drawFrame);
+      return;
+    }
+    lastTs = ts;
+
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width; const h = rect.height;
+    ctx.clearRect(0,0,w,h);
+
+    for(const f of flowers){
+      // update position (gentle floating)
+      const dt = delta;
+      f.y += f.speed * dt * (0.6 + Math.sin(f.floatPhase + ts/900) * 0.6);
+      f.x += Math.sin((ts + f.x) / 1600) * 0.02 * (f.size/18);
+      f.rot += f.rotSpeed * dt;
+      f.floatPhase += dt * 0.0012;
+      // wrap vertically
+      if(f.y > h + f.size) f.y = -f.size;
+      if(f.y < -f.size) f.y = h + f.size;
+      if(f.x > w + f.size) f.x = -f.size;
+      if(f.x < -f.size) f.x = w + f.size;
+
+      ctx.save();
+      ctx.globalAlpha = f.alpha;
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rot);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      // font fallback to system emoji-capable font; size scales gently
+      const drawSize = f.baseSize * (0.86 + 0.14 * Math.sin((ts + f.x) / 900));
+      ctx.font = `${Math.round(drawSize)}px serif`;
+      ctx.fillText(f.emoji, 0, 0);
+      ctx.restore();
+    }
+
+    rafId = requestAnimationFrame(drawFrame);
+  }
+
+  // expose cleanup so re-init can cancel previous loop/listeners
+  function cleanup(){
+    try{ if(rafId) cancelAnimationFrame(rafId); rafId = null; }catch(e){}
+    try{ if(pauseTimer) clearTimeout(pauseTimer); pauseTimer = null; }catch(e){}
+    try{ window.removeEventListener('resize', onResize); }catch(e){}
+    try{ document.removeEventListener('visibilitychange', onVisibility); }catch(e){}
+    // remove canvas
+    try{ if(canvas && canvas.parentElement) canvas.parentElement.removeChild(canvas); }catch(e){}
+  }
+
+  function onResize(){
+    // debounce resize
+    if(field._flowerResizeTimer) clearTimeout(field._flowerResizeTimer);
+    field._flowerResizeTimer = setTimeout(()=>{ resizeCanvas(); }, 240);
+  }
+  function onVisibility(){
+    // on visibility change, just kick the loop so it can pause/resume quickly
+    if(document.hidden){ if(rafId){ cancelAnimationFrame(rafId); rafId = null; } }
+    else { if(!rafId) rafId = requestAnimationFrame(drawFrame); }
+  }
+
+  window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', onVisibility);
+
+  // store cleanup hook on field so repeated initFlowers calls can tear down
+  field._flowerCleanup = cleanup;
+
+  // initialize sizes and start loop
+  resizeCanvas();
+  rafId = requestAnimationFrame(drawFrame);
+}
+
+// Snapshots
+function takeSnapshot(){
+  const boardArr = new Array(25).fill(null);
+  for(let i=0;i<25;i++){
+    const cell = board.children[i];
+    if(!cell) continue;
+    const pawnEl = cell.querySelector('.pawn');
+    const isCapturedRed = cell.classList.contains('captured-red');
+    const isCapturedBlue = cell.classList.contains('captured-blue');
+    const captured = isCapturedRed || isCapturedBlue;
+    if(pawnEl){
+      // There is a pawn DOM in this cell — record its color and moved flag.
+      boardArr[i] = { pawn: pawnEl.dataset.color, moved: pawnEl.dataset.moved === 'true', captured: captured, capturedBy: captured ? (isCapturedRed ? 'red' : 'blue') : null };
+    } else if(captured){
+      // Tile is captured but no pawn DOM is present (a previously captured tile).
+      boardArr[i] = { pawn: null, moved: false, captured: true, capturedBy: isCapturedRed ? 'red' : 'blue' };
+    } else {
+      boardArr[i] = null;
+    }
+  }
+  return {
+    board: boardArr,
+    currentPlayer,
+    scores: { red: scores.red, blue: scores.blue },
+    chainMode: !!chainMode,
+    chainCount: chainCount || 0,
+    chainPawnIdx: (chainPawn && chainPawn.parentElement) ? Number(chainPawn.parentElement.dataset.index) : null,
+    chainPrevIdx: (typeof chainPrevIdx === 'number') ? chainPrevIdx : null,
+    chainAllowLastMove: !!chainAllowLastMove,
+    ts: Date.now()
+  };
+}
+
+function applySnapshot(snapshot){
+  if(!snapshot || !Array.isArray(snapshot.board)) return;
+  suppressSnapshots = true;
+  // Always restore currentPlayer from snapshot
+  try{
+    // First, normalize all cells: remove pawn DOM and captured classes, then
+    // re-add the checkerboard class (white/black) so styling is consistent.
+    for(let i=0;i<25;i++){
+      const cell = board.children[i];
+      if(!cell) continue;
+      const existingPawn = cell.querySelector('.pawn');
+      if(existingPawn) existingPawn.remove();
+      cell.classList.remove('captured-red','captured-blue','white','black');
+      cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
+    }
+
+    // Rebuild cells from snapshot entries. Important: only create/append a
+    // pawn DOM when the snapshot entry explicitly contains a pawn. For tiles
+    // that are captured but have no pawn DOM (previously captured tiles left
+    // behind), we must not append a pawn — only apply the captured-* class.
+    for(let i=0;i<25;i++){
+      const entry = snapshot.board[i];
+      const cell = board.children[i];
+      if(!cell) continue;
+
+      if(entry && entry.captured && entry.pawn == null){
+        // Captured tile with no pawn DOM: show the captured class only.
+        if(entry.capturedBy === 'red') cell.classList.add('captured-red');
+        else if(entry.capturedBy === 'blue') cell.classList.add('captured-blue');
+        continue;
+      }
+
+      if(entry && entry.pawn){
+        // There should be a pawn DOM here — recreate it and set moved flag.
+        const pawn = makePawn(entry.pawn);
+        pawn.dataset.moved = entry.moved ? 'true' : 'false';
+        cell.appendChild(pawn);
+        pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+        // If this pawn occupies a captured tile, restore the captured class
+        if(entry.captured && entry.capturedBy){
+          if(entry.capturedBy === 'red') cell.classList.add('captured-red');
+          else if(entry.capturedBy === 'blue') cell.classList.add('captured-blue');
+        }
+        continue;
+      }
+
+      // Empty, non-captured tile — ensure no captured class and no pawn DOM
+      cell.classList.remove('captured-red','captured-blue');
+      // nothing to append
+    }
+
+    scores = { red: snapshot.scores.red, blue: snapshot.scores.blue };
+    chainMode = !!snapshot.chainMode;
+    chainCount = snapshot.chainCount || 0;
+    chainPawn = null;
+    chainPrevIdx = (typeof snapshot.chainPrevIdx === 'number') ? snapshot.chainPrevIdx : null;
+    chainAllowLastMove = !!snapshot.chainAllowLastMove;
+    if(typeof snapshot.chainPawnIdx === 'number' && snapshot.chainPawnIdx >= 0 && snapshot.chainPawnIdx < 25){
+      const cpCell = board.children[snapshot.chainPawnIdx];
+      if(cpCell) chainPawn = cpCell.querySelector('.pawn');
+    }
+  } finally {
+    suppressSnapshots = false;
+  }
+
+  currentPlayer = snapshot.currentPlayer;
+  updateStatus();
+  updateUndoRedoButtons();
+}
+
+function recordSnapshot(opts = { countAsMove: true }){
+  if(suppressSnapshots) return;
+  const { countAsMove } = opts;
+  undoStack.push(takeSnapshot());
+  undoStack[undoStack.length - 1].__countAsMove = !!countAsMove;
+  if(countAsMove) redoStack.length = 0;
+  updateUndoRedoButtons();
+  // If we're in multiplayer mode, send the finalized move snapshot to the server
+  try{
+    if(!!countAsMove && window.multiplayer && window.multiplayer.connected && typeof window.multiplayer.sendSnapshot === 'function'){
+      const snap = undoStack[undoStack.length - 1];
+      // send a lightweight snapshot; avoid circular references
+      window.multiplayer.sendSnapshot(snap);
+    }
+  }catch(e){ /* ignore */ }
+}
+function updateUndoRedoButtons(){
+  // Disable undo when there's no earlier snapshot available
+  undoBtn.disabled = undoStack.length <= 1;
+  redoBtn.disabled = redoStack.length === 0;
+}
+function undo(){
+  // Undo a single logical move. Snapshots may be grouped into multiple
+  // entries per move; we pop snapshots until we remove a snapshot that was
+  // marked as __countAsMove (the marker is set on the snapshot that ends a move).
+  if(undoStack.length <= 1) return;
+  // Pop snapshots into redoStack until we've popped at least one snapshot
+  // and the last popped snapshot has __countAsMove === true
+  let popped = null;
+  do {
+    popped = undoStack.pop();
+    if(!popped) break;
+    redoStack.push(popped);
+  } while(undoStack.length > 0 && !popped.__countAsMove);
+
+  // Apply the new top-of-stack snapshot (the state before the undone move)
+  const prev = undoStack[undoStack.length - 1];
+  if(prev) {
+    applySnapshot(prev);
+  }
+
+  // Cancel any scheduled AI and debounce resuming it so the user can press
+  // Undo multiple times quickly without the AI interrupting.
+  if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  // Invalidate any pending AI work so an AI action that already started
+  // thinking will abort when its session token is checked.
+  _aiSession++;
+  if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
+  _undoAiResumeTimer = setTimeout(()=>{
+    _undoAiResumeTimer = null;
+    if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
+  }, 620);
+
+  updateUndoRedoButtons();
+  updateStatus();
+}
+function redo(){
+  // Redo a single logical move: pop snapshots from redoStack and push them
+  // onto undoStack until we've pushed the snapshot that ends a move
+  if(redoStack.length === 0) return;
+  let applied = null;
+  do {
+    const snap = redoStack.pop();
+    if(!snap) break;
+    undoStack.push(snap);
+    applied = snap;
+  } while(redoStack.length > 0 && applied && !applied.__countAsMove);
+
+  // Apply the snapshot now at the top of the undoStack
+  const top = undoStack[undoStack.length - 1];
+  if(top) applySnapshot(top);
+
+  // Debounce AI resumption similar to undo
+  if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  _aiSession++;
+  if(_undoAiResumeTimer){ clearTimeout(_undoAiResumeTimer); _undoAiResumeTimer = null; }
+  _undoAiResumeTimer = setTimeout(()=>{
+    _undoAiResumeTimer = null;
+    if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(240);
+  }, 620);
+
+  updateUndoRedoButtons();
+  updateStatus(); // Always show scoreboard
+}
+// Ensure AI is scheduled if undo/redo left it as the active player
+function _postUndoRedo(){ scheduleAiIfNeeded(240); }
+
+// Board init
+function resetBoard(){
+  board.innerHTML = '';
+  scores = { red:0, blue:0 };
+  currentPlayer = 'red';
+  dragged = null; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null;
+  chainAllowLastMove = false;
+
+  for(let i=0;i<25;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (((Math.floor(i/5) + i%5) % 2 === 0) ? 'white' : 'black');
+    cell.dataset.index = i;
+    cell.addEventListener('click', ()=> onCellClick(cell));
+    cell.addEventListener('dragover', e=>e.preventDefault());
+    cell.addEventListener('drop', e=> handleDrop(e, cell));
+    board.appendChild(cell);
+  }
+
+  // starting pawns: blue row 0..4, red row 20..24
+  for(let i=0;i<5;i++){
+    const bluePawn = makePawn('blue');
+    bluePawn.dataset.moved = 'false';
+    board.children[i].appendChild(bluePawn);
+    bluePawn.__enableIdleAfterAppend && bluePawn.__enableIdleAfterAppend();
+  }
+  for(let i=20;i<25;i++){
+    const redPawn = makePawn('red');
+    redPawn.dataset.moved = 'false';
+    board.children[i].appendChild(redPawn);
+    redPawn.__enableIdleAfterAppend && redPawn.__enableIdleAfterAppend();
+  }
+
+  undoStack.length = 0; redoStack.length = 0;
+  undoStack.push(takeSnapshot());
+  updateUndoRedoButtons();
+  updateStatus();
+
+  if (typeof initFlowers === 'function') initFlowers();
+  // If AI is enabled and it's the AI's starting turn, schedule it
+  scheduleAiIfNeeded(600);
+}
+
+function onCellClick(cell){
+  const idx = Number(cell.dataset.index);
+  const row = Math.floor(idx / 5);
+  // If a chain attack is active, disallow spawning or moving any pawn other than
+  // the chain pawn that performed the capture. Spawning new pawns must wait
+  // until the chain is resolved. However, if the player clicks the chain
+  // pawn's current cell while a one-time final decision is allowed
+  // (chainAllowLastMove), consume that allowance and end the chain without
+  // moving the pawn (this lets the player 'choose to stay' by clicking).
+  if(chainMode && chainPawn){
+    const pawnInCell = cell.querySelector('.pawn');
+    // If the player clicked the chain pawn's current tile, allow them to
+    // consume/end the chain immediately (no movement) — this works at any
+    // point during the chain, not only when chainAllowLastMove is set.
+    if(pawnInCell === chainPawn){
+      // clear chain state
+      chainAllowLastMove = false;
+      chainMode = false;
+      chainPawn = null;
+      chainCount = 0;
+      chainPrevIdx = null;
+      // after ending the chain, check for a win then switch turn and record
+      if(!checkWinCapturedThreeInRow(currentPlayer)) {
+        switchTurn();
+        recordSnapshot({ countAsMove: true });
+      } else {
+        recordSnapshot({ countAsMove: true });
+      }
+      return;
+    }
+    // Clicking anywhere else while a chain is active should be ignored.
+    return;
+  }
+  if((currentPlayer === 'red' && row !== 4) || (currentPlayer==='blue' && row !== 0)) return;
+  if(cell.querySelector('.pawn')) return;
+  if(countPawns(currentPlayer) >= MAX_PAWNS_PER_PLAYER){
+    // Reached the maximum pawns for this player — silently ignore spawn attempts.
+    return;
+  }
+
+  if(chainMode && chainPawn){
+    const fromIdx = Number(chainPawn.parentElement.dataset.index);
+    const toIdx = idx;
+    const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
+    const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
+    if(isDiagonal(dx,dy)){
+      return;
+    }
+  }
+
+  const pawn = makePawn(currentPlayer);
+  // Do NOT set moved=true here; allow double-step on first move
+  cell.appendChild(pawn);
+  pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+  playPlacementSound();
+  showPlacementEffect(cell);
+  if(!checkWinCapturedThreeInRow(currentPlayer)) {
+    switchTurn();
+    recordSnapshot({ countAsMove: true });
+  } else {
+    recordSnapshot({ countAsMove: true });
+  }
+}
+
+// --- Emoji Picker Overlay (choose emoji for each player) ---
+const emojiPickerOverlay = document.createElement('div');
+emojiPickerOverlay.id = 'emojiPickerOverlay';
+emojiPickerOverlay.className = 'emoji-picker-overlay';
+emojiPickerOverlay.setAttribute('aria-hidden','false');
+emojiPickerOverlay.innerHTML = `
+  <div class="emoji-picker-modal">
+    <div class="emoji-box" style="min-width:360px; min-height:160px;">
+      <div style="margin-top:10px;text-align:center;">
+        <div class="side-chooser" style="display:flex;gap:12px;justify-content:center;">
+          <button type="button" class="side-option selected" data-side="red">Play as Red</button>
+          <button type="button" class="side-option" data-side="blue">Play as Blue</button>
+        </div>
+      </div>
+      <div class="emoji-chooser-row">
+        <div class="emoji-chooser">
+          <div class="emoji-chooser-title">Red team</div>
+          <div class="emoji-options" id="emojiOptionsRed"></div>
+          <div style="margin-top:8px;text-align:center;"><input id="teamNameRed" class="team-name-input" placeholder="Team name (e.g. Dragons)" /></div>
+        </div>
+        <div class="emoji-chooser">
+          <div class="emoji-chooser-title">Blue team</div>
+          <div class="emoji-options" id="emojiOptionsBlue"></div>
+          <div style="margin-top:8px;text-align:center;"><input id="teamNameBlue" class="team-name-input" placeholder="Team name (e.g. Unicorns)" /></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:16px;">
+        <button id="emojiConfirmBtn">Confirm</button>
+      </div>
+    </div>
+  </div>
+`;
+document.body.appendChild(emojiPickerOverlay);
+
+const emojiPickerStyle = document.createElement('style');
+emojiPickerStyle.textContent = `
+  .emoji-picker-overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,6,6,0.72); z-index:10000; }
+  /* Dark theme for emoji picker: black background, white foreground */
+  .emoji-picker-modal{ background:#0b0b0b;color:#fff;padding:22px;border-radius:12px; width: min(820px, 96vw); box-shadow:0 12px 48px rgba(0,0,0,0.6); text-align:center }
+  .emoji-chooser-row{ display:flex; gap:18px; justify-content:center; margin-top:12px }
+  .emoji-chooser{ min-width:220px }
+  .emoji-chooser-title{ font-weight:700; margin-bottom:8px }
+  .emoji-options{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center }
+  .emoji-option{ cursor:pointer; padding:8px 10px; border-radius:8px; font-size:28px; border:2px solid transparent; background: rgba(255,255,255,0.04); color:#fff; }
+  .emoji-option:hover{ transform:translateY(-2px); background: rgba(255,255,255,0.08); }
+  .emoji-option.selected{ box-shadow:0 6px 18px rgba(0,0,0,0.12); border-color:#ccc }
+  .emoji-picker-modal button{ background:#000;color:#fff;border:1px solid rgba(255,255,255,0.08);padding:8px 12px;border-radius:8px;cursor:pointer }
+  .emoji-picker-modal button:hover{ background:#111 }
+  .team-name-input{ width:88%; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08); background:rgba(255,255,255,0.02); color:#fff }
+  /* Side chooser buttons */
+  .side-option{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:14px 12px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    color:#fff;
+    cursor:pointer;
+    font-weight:800;
+    font-size:1.15em;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+    flex: 0 0 160px; /* fixed width parity with coin choices */
+    min-width: 140px;
+    text-align:center;
+    box-sizing: border-box;
+  }
+  .side-option:hover{ box-shadow: 0 18px 38px rgba(0,0,0,0.26); }
+  .side-option.selected{
+    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    box-shadow: 0 18px 38px rgba(0,0,0,0.28);
+    border: 3px solid rgba(255,255,255,1) !important;
+    position: relative;
+    z-index: 3;
+  }
+  /* Coin flip choice buttons (enlarged & enhanced) */
+  /* curved white box around the coin title */
+  .coin-title {
+    font-weight:800;
+    font-size:1.08em;
+    margin-bottom:12px;
+    letter-spacing:0.4px;
+    display:inline-block;
+    background: #000000; /* black box background */
+    color: #ffffff; /* white text */
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 2px solid #ffffff; /* white border */
+    box-shadow: 0 8px 20px rgba(0,0,0,0.42);
+    max-width: 92%;
+    line-height: 1.15;
+  }
+  /* ensure both coin choice buttons are identical size and aligned; remove hover movement */
+  .coin-choices{ display:flex; gap:14px; justify-content:center; margin-top:12px; align-items:center; }
+  .coin-choice{
+    padding:14px 12px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    color:#fff;
+    cursor:pointer;
+    font-weight:800;
+    font-size:1.15em;
+    transition: box-shadow 160ms ease, border-color 160ms ease;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex: 0 0 160px; /* fixed width for parity */
+    min-width: 140px;
+    text-align:center;
+    box-sizing: border-box;
+  }
+  /* on hover only change shadow/border — do NOT translate/scale */
+  .coin-choice:hover{ box-shadow: 0 18px 38px rgba(0,0,0,0.26); }
+  .coin-choice.selected{
+    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    /* stronger shadow and thick white outline to indicate selection */
+    box-shadow: 0 18px 38px rgba(0,0,0,0.28);
+    border: 3px solid rgba(255,255,255,1) !important;
+    position: relative;
+    z-index: 3;
+    /* removed transform so selected button doesn't move */
+  }
+  /* Color the coin choice buttons to indicate team mapping: heads -> blue, tails -> red */
+  .coin-choice[data-choice="heads"]{ background: linear-gradient(90deg,#2b8cff,#1f6fe8); border-color: rgba(40,140,255,0.28); color:#fff }
+  .coin-choice[data-choice="tails"]{ background: linear-gradient(90deg,#ff6b6b,#e04444); border-color: rgba(255,100,100,0.28); color:#fff }
+  /* Coin result visual and spinning animation (3D coin with two faces) */
+  #coinResult{ will-change: transform; display:inline-block; perspective:1200px; }
+  /* make the coin 15% smaller overall by scaling the computed coin size */
+  .coin{ --coin-size: calc(min(220px, 48vw) * 0.85); width:var(--coin-size); height:var(--coin-size); display:inline-block; position:relative; transform-style:preserve-3d; overflow:hidden; box-shadow: 0 18px 48px rgba(0,0,0,0.36); border-radius: 50%; }
+  .coin-face{ position:absolute; left:0; top:0; right:0; bottom:0; display:flex; align-items:center; justify-content:center; border-radius:50%; backface-visibility:hidden; -webkit-backface-visibility:hidden; box-shadow: 0 12px 36px rgba(0,0,0,0.5), inset 0 8px 20px rgba(255,255,255,0.05); font-size: 0; line-height:1; }
+  /* enlarge the emoji used as the coin face so it fills more of the coin */
+  .coin-emoji{ display:inline-block; font-size: calc(var(--coin-size) * 0.94); line-height:1; transform: translateY(-4%); text-shadow: 0 4px 10px rgba(0,0,0,0.35); }
+  .coin-face.front{ background: radial-gradient(circle at 30% 30%, #fff9d9, #ffd66b 40%, #f0b54a 70%); }
+  .coin-face.back{ transform: rotateY(180deg); background: radial-gradient(circle at 30% 30%, #fbfbfb, #d6d6d6 40%, #b0b0b0 70%); }
+  /* thinner rim for a subtler 3D edge */
+  .coin::before{ content: ''; position:absolute; left:2px; top:2px; right:2px; bottom:2px; border-radius:50%; box-shadow: 0 0 0 3px rgba(0,0,0,0.06) inset; pointer-events:none; }
+  /* spinning animation applied to the .coin element */
+  .coin.spinning{ animation: coinFlip 3500ms cubic-bezier(.08,.8,.2,1); }
+  @keyframes coinFlip{
+    0%   { transform: rotateY(0deg)    scale(1); }
+    30%  { transform: rotateY(1260deg) scale(1.08); } /* fast initial spins */
+    70%  { transform: rotateY(1620deg) scale(1.04); } /* slowing down */
+    100% { transform: rotateY(1800deg) scale(1); }    /* settle */
+  }
+  /* coin result color states */
+  .coin.result-red .coin-face.front{ background: radial-gradient(circle at 30% 30%, #ffd6d6, #ff9a9a 40%, #ff6b6b 70%); }
+  .coin.result-red .coin-face.back{ background: radial-gradient(circle at 30% 30%, #e7f2ff, #bfe0ff 40%, #79b9ff 70%); }
+  .coin.result-blue .coin-face.front{ background: radial-gradient(circle at 30% 30%, #e7f2ff, #bfe0ff 40%, #79b9ff 70%); }
+  .coin.result-blue .coin-face.back{ background: radial-gradient(circle at 30% 30%, #ffd6d6, #ff9a9a 40%, #ff6b6b 70%); }
+  /* Flip button styling (prominent CTA) */
+  #flipCoinBtn{ padding:14px 26px; font-size:1.12em; font-weight:800; border-radius:12px; border:none; background: linear-gradient(90deg,#ffd66b,#ffb84a); color:#111; box-shadow: 0 12px 34px rgba(0,0,0,0.32); cursor:pointer; transition: transform 140ms ease, box-shadow 140ms ease; }
+  #flipCoinBtn:hover{ transform: translateY(-4px); box-shadow: 0 20px 48px rgba(0,0,0,0.36); }
+  #flipCoinBtn:disabled{ opacity:0.6; cursor:not-allowed; transform:none; box-shadow: 0 8px 22px rgba(0,0,0,0.18); }
+  /* curved white border around the emoji picker content (match credits/rules) */
+  #emojiPickerOverlay .emoji-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    margin-top: calc(6px * var(--scale));
+    text-align: center;
+  }
+`;
+document.head.appendChild(emojiPickerStyle);
+
+// default emoji choices (restricted to the allowed set)
+const EMOJI_CHOICES = ['🧜‍♀️','🧙‍♂️','😈','🐲','🦄','🦖','🤡','👽','🤖','💩','😺','🐶','🐸','🐔','😇'];
+// mapping from emoji to a human-friendly team name (plural where appropriate)
+const EMOJI_TO_NAME = {
+  '🧜‍♀️': 'Mermaids',
+  '🧙‍♂️': 'Wizards',
+  '😈': 'Devils',
+  '🐲': 'Dragons',
+  '🦄': 'Unicorns',
+  '🦖': 'Dinosaurs',
+  '🤡': 'Clowns',
+  '👽': 'Aliens',
+  '🤖': 'Robots',
+  '💩': 'Poopies',
+  '😺': 'Cats',
+  '🐶': 'Dogs',
+  '🐸': 'Frogs',
+  '🐔': 'Chickens',
+  '😇': 'Angels'
+};
+// sensible defaults from the allowed set
+window.selectedEmoji = { red: '🐲', blue: '🦄' };
+// store chosen team 'name' values — default to the textual names from the mapping
+window.selectedEmojiNames = { red: EMOJI_TO_NAME[window.selectedEmoji.red] || 'Red Team', blue: EMOJI_TO_NAME[window.selectedEmoji.blue] || 'Blue Team' };
+// which side the human player will control (default red)
+window.humanColor = 'red';
+// flag to indicate coin-flip modal is active; when true, AI should not take its turn
+window.coinFlipActive = false;
+
+function buildEmojiOptions(containerId, team){
+  const wrap = document.getElementById(containerId);
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  EMOJI_CHOICES.forEach(e=>{
+    const btn = document.createElement('button');
+    btn.className = 'emoji-option';
+    btn.type = 'button';
+    btn.textContent = e;
+    btn.addEventListener('click', ()=>{
+      window.selectedEmoji[team] = e;
+      // set the team-name input to the textual name from mapping so scoreboard shows text
+      try{
+        const input = document.getElementById(team === 'red' ? 'teamNameRed' : 'teamNameBlue');
+        if(input) input.value = EMOJI_TO_NAME[e] || e;
+      }catch(err){ }
+      refreshEmojiSelectionUI();
+    });
+    wrap.appendChild(btn);
+  });
+  // after building, initialize the team name input with either the stored name or a mapping
+  try{
+    const inR = document.getElementById('teamNameRed');
+    const inB = document.getElementById('teamNameBlue');
+  if(inR) inR.value = window.selectedEmojiNames && window.selectedEmojiNames.red ? window.selectedEmojiNames.red : (window.selectedEmoji.red || '');
+  if(inB) inB.value = window.selectedEmojiNames && window.selectedEmojiNames.blue ? window.selectedEmojiNames.blue : (window.selectedEmoji.blue || '');
+  }catch(e){}
+}
+
+function refreshEmojiSelectionUI(){
+  const reds = document.getElementById('emojiOptionsRed').children;
+  for(const b of reds){ b.classList.toggle('selected', b.textContent === window.selectedEmoji.red); }
+  const blues = document.getElementById('emojiOptionsBlue').children;
+  for(const b of blues){ b.classList.toggle('selected', b.textContent === window.selectedEmoji.blue); }
+}
+
+document.getElementById('emojiConfirmBtn').addEventListener('click', ()=>{
+  // save textual team names from inputs (fallback to emoji mapping)
+  try{
+    const nameR = (document.getElementById('teamNameRed') && document.getElementById('teamNameRed').value) ? document.getElementById('teamNameRed').value.trim() : (EMOJI_TO_NAME[window.selectedEmoji.red] || 'Red Team');
+    const nameB = (document.getElementById('teamNameBlue') && document.getElementById('teamNameBlue').value) ? document.getElementById('teamNameBlue').value.trim() : (EMOJI_TO_NAME[window.selectedEmoji.blue] || 'Blue Team');
+    window.selectedEmojiNames = { red: nameR, blue: nameB };
+  }catch(e){ /* ignore */ }
+
+  // apply to existing pawns' visible faces (emoji glyphs)
+  document.querySelectorAll('.pawn .pface').forEach(pf=>{
+    const pawnEl = pf.parentElement;
+    if(pawnEl && pawnEl.dataset && pawnEl.dataset.color){
+      pf.textContent = pawnEl.dataset.color === 'red' ? window.selectedEmoji.red : window.selectedEmoji.blue;
+    }
+  });
+  // update victory and status UI by forcing refresh
+  updateStatus();
+  // present coin flip so the player can determine who starts
+  try{
+    showCoinFlip();
+  }catch(e){
+    // fallback: set AI color and hide overlay immediately
+    aiColor = (window.humanColor === 'red') ? 'blue' : 'red';
+    if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(320);
+    emojiPickerOverlay.setAttribute('aria-hidden','true');
+    emojiPickerOverlay.style.display = 'none';
+  }
+});
+
+// build options and show overlay on load
+buildEmojiOptions('emojiOptionsRed','red');
+buildEmojiOptions('emojiOptionsBlue','blue');
+refreshEmojiSelectionUI();
+
+// Side chooser wiring: allow player to pick red or blue at start
+function refreshSideSelectionUI(){
+  const buttons = document.querySelectorAll('.side-option');
+  buttons.forEach(b=> b.classList.toggle('selected', b.dataset.side === window.humanColor));
+}
+document.querySelectorAll('.side-option').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    window.humanColor = b.dataset.side;
+    refreshSideSelectionUI();
+  });
+});
+refreshSideSelectionUI();
+
+// Coin flip UI: shows after Confirm so the game knows who goes first
+function showCoinFlip(){
+  const redName = (window.selectedEmojiNames && window.selectedEmojiNames.red) ? window.selectedEmojiNames.red : (EMOJI_TO_NAME[window.selectedEmoji.red] || 'Red');
+  const blueName = (window.selectedEmojiNames && window.selectedEmojiNames.blue) ? window.selectedEmojiNames.blue : (EMOJI_TO_NAME[window.selectedEmoji.blue] || 'Blue');
+  const redLabel = `Red ${redName}`;
+  const blueLabel = `Blue ${blueName}`;
+  // default coin choice is heads for the human
+  let coinChoice = 'heads';
+  // mark coin flip modal active so the AI does not take a turn until it closes
+  window.coinFlipActive = true;
+  emojiPickerOverlay.innerHTML = `
+    <div class="emoji-picker-modal" style="text-align:center;">
+      <div class="emoji-box">
+          <div class="coin-title">Select heads or tails and flip the coin to see who goes first.</div>
+          <div class="coin-choices">
+            <label class="coin-choice selected" data-choice="heads"><input type="radio" name="coinChoice" value="heads" checked style="display:none" aria-hidden="true">Heads</label>
+            <label class="coin-choice" data-choice="tails"><input type="radio" name="coinChoice" value="tails" style="display:none" aria-hidden="true">Tails</label>
+          </div>
+          <div style="margin:18px 0;" id="coinResult">
+            <div class="coin" aria-hidden="true">
+                <div class="coin-face front"><span class="coin-emoji">🪙</span></div>
+                <div class="coin-face back"><span class="coin-emoji">🪙</span></div>
+              </div>
+          </div>
+      <div style="display:flex;justify-content:center;gap:12px;">
+        <button id="flipCoinBtn">Flip Coin</button>
+      </div>
+      </div>
+    </div>
+  `;
+  const coinResult = document.getElementById('coinResult');
+  const coinElem = coinResult ? coinResult.querySelector('.coin') : null;
+  const flipBtn = document.getElementById('flipCoinBtn');
+  const choiceButtons = document.querySelectorAll('.coin-choice');
+  choiceButtons.forEach(b=> b.addEventListener('click', ()=>{
+    coinChoice = b.dataset.choice;
+    choiceButtons.forEach(x=> x.classList.toggle('selected', x === b));
+  }));
+  function finishWith(winner){
+    currentPlayer = winner;
+    // do not display a coin-flip message above the scoreboard
+    // ensure AI color is opposite of human
+    aiColor = (window.humanColor === 'red') ? 'blue' : 'red';
+    // refresh scoreboard/status without an extra message
+    updateStatus();
+    // keep the coin result visible a bit longer before closing the modal
+    setTimeout(()=>{
+      emojiPickerOverlay.setAttribute('aria-hidden','true');
+      emojiPickerOverlay.style.display = 'none';
+      // coin flip modal has closed — allow AI to act if it is their turn
+      window.coinFlipActive = false;
+      if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(600);
+    }, 2800);
+  }
+  flipBtn.addEventListener('click', ()=>{
+    if(!coinElem) return;
+  // Prevent multiple clicks: disable the flip button and lock the choice buttons
+  if(flipBtn.disabled) return;
+  flipBtn.disabled = true;
+  flipBtn.classList.add('disabled');
+  try{ choiceButtons.forEach(b=>{ b.style.pointerEvents = 'none'; /* keep .selected so the user's choice stays highlighted during spin */ }); }catch(e){}
+    // start coin spin animation
+    // clear any previous result styling
+    coinElem.classList.remove('result-red','result-blue');
+    coinElem.classList.remove('spun');
+    coinElem.classList.add('spinning');
+    // small visual sequence: animate the coin, then reveal winner
+    setTimeout(()=>{
+      const flip = Math.random() < 0.5 ? 'heads' : 'tails';
+      // Map sides: heads => blue, tails => red
+      const sideToTeam = { heads: 'blue', tails: 'red' };
+      const winnerTeam = sideToTeam[flip];
+      // stop spinning and show winning team's emoji on the front face
+      coinElem.classList.remove('spinning');
+      coinElem.classList.add('spun');
+  const front = coinElem.querySelector('.coin-face.front');
+  const back = coinElem.querySelector('.coin-face.back');
+  const fSpan = front && front.querySelector('.coin-emoji');
+  const bSpan = back && back.querySelector('.coin-emoji');
+  if(fSpan) fSpan.textContent = winnerTeam === 'red' ? (window.selectedEmoji.red || '🔴') : (window.selectedEmoji.blue || '🔵');
+  if(bSpan) bSpan.textContent = winnerTeam === 'red' ? (window.selectedEmoji.blue || '🔵') : (window.selectedEmoji.red || '🔴');
+  // apply colored result class so coin face backgrounds match winner
+  if(coinElem){
+    coinElem.classList.remove('result-red','result-blue');
+    coinElem.classList.add(winnerTeam === 'red' ? 'result-red' : 'result-blue');
+  }
+      finishWith(winnerTeam);
+    }, 3500);
+  });
+  // No random button — only allow explicit flip by player
+}
+
+
+function countPawns(color){ let count = 0; for(let i=0;i<board.children.length;i++){ const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(p && p.dataset.color === color) count++; } return count; }
+
+function isValidMove(dx,dy){ return dx <= 1 && dy <= 1 && (dx + dy > 0); }
+function isValidCapture(dx,dy){ return dx === 1 && dy === 1; }
+
+// New helper: canDoubleStep for first move (non-capturing, straight)
+function canDoubleStep(pawn, fromIdx, toIdx){
+  if(!pawn) return false;
+  if(pawn.dataset.moved === 'true') return false;
+  const dx = (toIdx % 5) - (fromIdx % 5);
+  const dy = Math.floor(toIdx / 5) - Math.floor(fromIdx / 5);
+  if(dx !== 0) return false;
+  if(Math.abs(dy) !== 2) return false;
+  // ensure direction is forward for the pawn
+  if(pawn.dataset.color === 'red' && dy > 0) return false; // red starts bottom, forward is up (negative) — adapt depending on your board orientation
+  if(pawn.dataset.color === 'blue' && dy < 0) return false;
+  // check intermediate cell empty
+  const midY = Math.floor((Math.floor(fromIdx / 5) + Math.floor(toIdx / 5)) / 2);
+  const midX = fromIdx % 5;
+  const midIdx = midY * 5 + midX;
+  const midCell = board.children[midIdx];
+  if(!midCell) return false;
+  if(midCell.querySelector('.pawn')) return false;
+  // destination must be empty (non-capturing)
+  const destCell = board.children[toIdx];
+  if(!destCell) return false;
+  if(destCell.querySelector('.pawn')) return false;
+  return true;
+}
+
+function availableDiagonalCapturesFromCell(cellElem){
+  if(!cellElem) return [];
+  const idx = Number(cellElem.dataset.index); const x = idx % 5; const y = Math.floor(idx/5);
+  const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+  const out = [];
+  const pawn = cellElem.querySelector('.pawn'); if(!pawn) return [];
+  for(const [dx,dy] of dirs){
+    const nx = x + dx, ny = y + dy;
+    if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
+    const nIdx = ny*5 + nx; const neighbor = board.children[nIdx];
+    const occ = neighbor.querySelector('.pawn');
+    if(occ && occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+  }
+  return out;
+}
+
+// handleDrop: updated to allow double-step on first move
+function handleDrop(e, targetCell){
+  e.preventDefault && e.preventDefault();
+  if(!dragged) return;
+  const pawn = dragged;
+  const fromCell = pawn.parentElement;
+  if(!fromCell){ dragged = null; return; }
+  const fromIdx = Number(fromCell.dataset.index), toIdx = Number(targetCell.dataset.index);
+  const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
+  const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
+  // allow normal king-step moves or first-move double-step
+  if(!(isValidMove(dx,dy) || canDoubleStep(pawn, fromIdx, toIdx))) return;
+
+  const existing = targetCell.querySelector('.pawn');
+
+  // If a chain is active, disallow diagonal moves that are not captures
+  if(chainMode && chainPawn){
+    if(isDiagonal(dx,dy) && !(existing && existing.dataset.color !== pawn.dataset.color)){
+      // allow diagonal non-capture moves during a chain if at least one orthogonal
+      // adjacent tile in the movement L-shape is empty (provides a clear path)
+      const fx = fromIdx % 5, fy = Math.floor(fromIdx/5);
+      const tx = toIdx % 5, ty = Math.floor(toIdx/5);
+      const adj1 = board.children[fy * 5 + tx]; // tile at (tx, fy)
+      const adj2 = board.children[ty * 5 + fx]; // tile at (fx, ty)
+      const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+      const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+      // allow stepping back to the previous square of the chain pawn
+      if(toIdx === chainPrevIdx) {
+        // permitted if the previous square is empty (should be empty because pawn moved)
+      } else if(!(adj1Empty || adj2Empty)){
+        return;
+      }
+    }
+  }
+
+  // Capture branch (diagonal capture)
+  if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy)){
+    existing.classList.add('captured');
+    showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
+    playCaptureMelody(Math.min(6, Math.max(1, chainCount + 1)));
+    setTimeout(()=>{
+  // leave a trail behind at the origin cell when a pawn moves, oriented toward the destination
+  try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
+      targetCell.innerHTML = '';
+      targetCell.classList.remove('white','black','captured-red','captured-blue');
+      targetCell.classList.add(pawn.dataset.color === 'red' ? 'captured-red' : 'captured-blue');
+      targetCell.appendChild(pawn);
+      pawn.classList.remove('dragging');
+      pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+      // mark moved
+      pawn.dataset.moved = 'true';
+      scores[currentPlayer]++; chainCount++;
+      showCaptureEffect(targetCell, pawn.dataset.color);
+      const further = availableDiagonalCapturesFromCell(targetCell);
+      if(further.length > 0){
+        chainMode = true;
+        chainPawn = pawn;
+        // remember where this pawn came from so it can step back if needed
+        chainPrevIdx = fromIdx;
+        dragged = pawn;
+        recordSnapshot({ countAsMove: true });
+        updateStatus();
+        // If AI made this capture and it's the AI's pawn, schedule the next capture
+        if(aiEnabled && pawn.dataset.color === aiColor){
+          // wait slightly longer than the capture animation timeout before continuing
+          setTimeout(()=> scheduleAiIfNeeded(260), 260);
+        }
+      } else {
+        // No immediate captures remain — allow the pawn one final non-capture decision.
+        // Keep chain mode active but mark that the pawn is allowed one last move.
+        chainMode = true;
+        chainPawn = pawn;
+        chainPrevIdx = fromIdx;
+        chainAllowLastMove = true;
+        dragged = pawn;
+        // record the state so undo/redo will restore the fact that a final
+        // choice is available (this does not count as an extra move)
+        recordSnapshot({ countAsMove: true });
+        updateStatus();
+        // AI should not auto-continue here; schedule only if AI is the current actor
+        if(aiEnabled && pawn.dataset.color === aiColor){
+          // let the AI decide — it may choose to use the final move
+          setTimeout(()=> scheduleAiIfNeeded(260), 260);
+        }
+      }
+    }, 220);
+    return;
+  }
+
+  // Non-capture branch — includes single-step moves and double-step first move
+  if(existing) return;
+  // perform move
+  // leave a trail at the origin cell when a pawn moves, oriented toward the destination
+  try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
+  targetCell.appendChild(pawn);
+  pawn.classList.remove('dragging');
+  pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+  // mark moved if it was a single-step or a double-step (double-step check handled above)
+  pawn.dataset.moved = 'true';
+  playPlacementSound();
+  showPlacementEffect(targetCell);
+  // If this move was the one-time final decision after a chain with no further captures,
+  // consume that allowance and end the chain before switching turns.
+  if(chainAllowLastMove && pawn === chainPawn){
+    chainAllowLastMove = false;
+    chainMode = false;
+    chainPawn = null;
+    chainCount = 0;
+    chainPrevIdx = null;
+    // after consuming final decision, check for a win then switch turn as usual
+    if(!checkWinCapturedThreeInRow(currentPlayer)) {
+      switchTurn();
+      recordSnapshot({ countAsMove: true });
+    } else {
+      recordSnapshot({ countAsMove: true });
+    }
+    return;
+  }
+
+  if(!checkWinCapturedThreeInRow(currentPlayer)) {
+    switchTurn();
+    recordSnapshot({ countAsMove: true });
+  } else {
+    recordSnapshot({ countAsMove: true });
+  }
+}
+
+function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null; chainAllowLastMove = false; scheduleAiIfNeeded(); }
+// When turn switches, if AI is enabled and it's the AI's color, schedule its move.
+function scheduleAiIfNeeded(delay = 420){
+  if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+  // If any overlay/picker/modal is open, defer AI until it closes
+  if(typeof isAnyOverlayOpen === 'function' ? isAnyOverlayOpen() : (window.coinFlipActive)) return;
+  if(!aiEnabled) return;
+  if(currentPlayer !== aiColor) return;
+  _aiTimer = setTimeout(()=>{ _aiTimer = null; try{ aiTakeTurn(_aiSession); }catch(e){ console.warn('AI error', e); } }, delay);
+}
+
+// Return true if any known modal/overlay is currently visible/open.
+function isAnyOverlayOpen(){
+  try{
+    // Check the main overlays by id if they exist
+      const ids = ['emojiPickerOverlay','rulesOverlay','victoryOverlay','creditsOverlay'];
+    for(const id of ids){
+      const el = document.getElementById(id);
+      if(!el) continue;
+      // If aria-hidden is explicitly false or the element is visible in layout, consider it open
+      const aria = el.getAttribute('aria-hidden');
+      if(aria === 'false') return true;
+      const style = window.getComputedStyle(el);
+      if(style && style.display !== 'none' && style.visibility !== 'hidden' && parseFloat(style.opacity || '1') > 0) return true;
+      if(el.classList && el.classList.contains('show')) return true;
+    }
+  }catch(e){ /* ignore and fall through */ }
+  return false;
+}
+
+function showCaptureEffect(cell,color){ cell.style.transition = 'transform .18s ease, box-shadow .18s ease'; cell.style.transform = 'scale(1.04)'; setTimeout(()=>{ cell.style.transform = ''; }, 160); }
+function capturedOwnerOf(index){ const cell = board.children[index]; if(!cell) return null; if(cell.classList.contains('captured-red')) return 'red'; if(cell.classList.contains('captured-blue')) return 'blue'; return null; }
+
+function checkCapturedRunOfThreeForColor(color){
+  for(let r=0;r<5;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf(r*5 + c+1) === color && capturedOwnerOf(r*5 + c+2) === color) return true; } }
+  for(let c=0;c<5;c++){ for(let r=0;r<=2;r++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c) === color && capturedOwnerOf((r+2)*5 + c) === color) return true; } }
+  for(let r=0;r<=2;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r+1)*5 + c+1) === color && capturedOwnerOf((r+2)*5 + c+2) === color) return true; } }
+  for(let r=2;r<5;r++){ for(let c=0;c<=2;c++){ if(capturedOwnerOf(r*5 + c) === color && capturedOwnerOf((r-1)*5 + c+1) === color && capturedOwnerOf((r-2)*5 + c+2) === color) return true; } }
+  return false;
+}
+
+function checkWinCapturedThreeInRow(playerColor){ if(checkCapturedRunOfThreeForColor(playerColor)){ endGame(playerColor); return true; } return false; }
+function endGame(playerColor){
+  updateStatus('');
+  // freeze board UI by replacing nodes with clones (preserves visuals, removes listeners)
+  board.querySelectorAll('.cell').forEach(cell => { cell.replaceWith(cell.cloneNode(true)); });
+  // show victory overlay and play short melodic tune
+  try{ showVictory(playerColor); playVictoryTune(playerColor); }catch(e){ console.warn('victory UI error', e); }
+}
+
+// Victory UI + tune
+let victoryNodes = null;
+function midiToFreq(m){ return 440 * Math.pow(2, (m - 69) / 12); }
+function showVictory(playerColor){
+  const overlay = document.getElementById('victoryOverlay');
+  const emoji = document.getElementById('victoryEmoji');
+  const title = document.getElementById('victoryTitle');
+  const txt = document.getElementById('victoryText');
+  if(!overlay) return;
+  // use selected emoji if available
+  const redEmoji = (window.selectedEmoji && window.selectedEmoji.red) ? window.selectedEmoji.red : '🐲';
+  const blueEmoji = (window.selectedEmoji && window.selectedEmoji.blue) ? window.selectedEmoji.blue : '🦄';
+  emoji.textContent = playerColor === 'red' ? redEmoji : blueEmoji;
+  const redName = (window.selectedEmojiNames && window.selectedEmojiNames.red) ? window.selectedEmojiNames.red : (EMOJI_TO_NAME[redEmoji] || 'Red Team');
+  const blueName = (window.selectedEmojiNames && window.selectedEmojiNames.blue) ? window.selectedEmojiNames.blue : (EMOJI_TO_NAME[blueEmoji] || 'Blue Team');
+  const redLabel = `Red ${redName}`;
+  const blueLabel = `Blue ${blueName}`;
+  title.textContent = `${playerColor === 'red' ? redLabel : blueLabel} Wins!`;
+  txt.textContent = `Congrats — ${playerColor === 'red' ? redLabel : blueLabel} captured three tiles in a row.`;
+  overlay.classList.add('show'); overlay.removeAttribute('aria-hidden');
+  // visually disable board interactions
+  try{ board.style.pointerEvents = 'none'; }catch(e){}
+
+  const restart = document.getElementById('victoryRestart');
+  const close = document.getElementById('victoryClose');
+  if(restart) restart.onclick = ()=>{ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; resetBoard(); };
+  if(close) close.onclick = ()=>{ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; };
+}
+
+function hideVictory(){ const overlay = document.getElementById('victoryOverlay'); if(!overlay) return; overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; stopVictoryTune(); }
+
+function playVictoryTune(playerColor){
+  try{
+    ensureAudioContext();
+    if(victoryNodes) return; // already playing
+    const master = audioCtx.createGain(); master.gain.value = 0.20; master.connect(audioCtx.destination);
+
+    // upbeat tune: faster tempo, stacked melodic voices, and light percussion
+    const bpm = 160; const beatMs = 60000 / bpm; const gap = Math.round(beatMs / 2); // 8th-note feel
+    const melody = playerColor === 'red' ? [76,79,81,84,81,79,76,74] : [71,74,76,79,76,74,71,69];
+    const leadDur = 0.18; const timeouts = []; const oscs = [];
+
+    // percussion helper: short click/snare
+    const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.5, audioCtx.sampleRate);
+    const nd = noiseBuf.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i] = (Math.random()*2-1) * Math.exp(-i/2000);
+    function playClap(tOffset=0){ const id = setTimeout(()=>{ const now = audioCtx.currentTime; const src = audioCtx.createBufferSource(); src.buffer = noiseBuf; const bp = audioCtx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1800; const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.9, now + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.14); src.connect(bp); bp.connect(g); g.connect(master); src.start(now); src.stop(now + 0.12); }, tOffset); timeouts.push(id); }
+
+    // short bass thump under each downbeat
+    function playThump(){ const now = audioCtx.currentTime; const o = audioCtx.createOscillator(); o.type='sine'; o.frequency.setValueAtTime(80, now); const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.9, now + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.26); o.connect(g); g.connect(master); o.start(now); o.stop(now + 0.28); }
+
+    // lead voice (bright) + harmony voice (detuned)
+    melody.forEach((m,i)=>{
+      const t = i * gap;
+      const id = setTimeout(()=>{
+        const now = audioCtx.currentTime;
+        // lead
+        const o1 = audioCtx.createOscillator(); o1.type='sawtooth'; o1.frequency.value = midiToFreq(m);
+        const g1 = audioCtx.createGain(); g1.gain.setValueAtTime(0.0001, now); g1.gain.linearRampToValueAtTime(0.28, now + 0.01); g1.gain.exponentialRampToValueAtTime(0.0001, now + leadDur);
+        const hp1 = audioCtx.createBiquadFilter(); hp1.type='highpass'; hp1.frequency.value=220;
+        o1.connect(hp1); hp1.connect(g1); g1.connect(master);
+        o1.start(now); o1.stop(now + leadDur + 0.02);
+        oscs.push(o1);
+        // harmony (slightly detuned triangle)
+        const o2 = audioCtx.createOscillator(); o2.type='triangle'; o2.frequency.value = midiToFreq(m - (i%2===0?0:12)) * (1.002 + Math.random()*0.004);
+        const g2 = audioCtx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.linearRampToValueAtTime(0.18, now + 0.01); g2.gain.exponentialRampToValueAtTime(0.0001, now + leadDur);
+        o2.connect(g2); g2.connect(master); o2.start(now); o2.stop(now + leadDur + 0.02); oscs.push(o2);
+
+        // percussion and thump on downbeat (every 2 steps)
+        if(i % 2 === 0){ playThump(); playClap(0); }
+      }, t);
+      timeouts.push(id);
+    });
+
+    // quick little arpeggiated sparkle underneath using high triangle
+    const sparkleIds = [];
+    for(let i=0;i<melody.length*2;i++){
+      const id = setTimeout(()=>{ const now = audioCtx.currentTime; const note = melody[i % melody.length] + 12; const o = audioCtx.createOscillator(); o.type='triangle'; o.frequency.value = midiToFreq(note); const g = audioCtx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.linearRampToValueAtTime(0.12, now + 0.008); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.12); o.connect(g); g.connect(master); o.start(now); o.stop(now + 0.14); oscs.push(o); }, i * (gap/2)); sparkleIds.push(id); timeouts.push(id); }
+
+    // total duration and cleanup
+    const totalMs = melody.length * gap + 600;
+    const endId = setTimeout(()=>{ try{ master.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4); setTimeout(()=>{ try{ master.disconnect(); }catch(e){} }, 600); }catch(e){} finally { victoryNodes = null; } }, totalMs);
+
+    victoryNodes = { master, timeouts, oscs, endId };
+  }catch(e){ console.warn('victory tune error', e); }
+}
+
+function stopVictoryTune(){ if(!victoryNodes) return; try{ const n = victoryNodes; if(n.timeouts) n.timeouts.forEach(id=>clearTimeout(id)); if(n.oscs) n.oscs.forEach(o=>{ try{o.stop();}catch(e){} }); if(n.master){ const now = audioCtx.currentTime; n.master.gain.cancelScheduledValues(now); n.master.gain.setValueAtTime(n.master.gain.value, now); n.master.gain.linearRampToValueAtTime(0.0001, now + 0.3); setTimeout(()=>{ try{ n.master.disconnect(); }catch(e){} }, 400); } }catch(e){} finally { victoryNodes = null; } }
+
+function updateStatus(msg='') {
+  const redEmoji = (window.selectedEmoji && window.selectedEmoji.red) ? window.selectedEmoji.red : '🐲';
+  const blueEmoji = (window.selectedEmoji && window.selectedEmoji.blue) ? window.selectedEmoji.blue : '🦄';
+  const redName = (window.selectedEmojiNames && window.selectedEmojiNames.red) ? window.selectedEmojiNames.red : (EMOJI_TO_NAME[redEmoji] || 'Red Team');
+  const blueName = (window.selectedEmojiNames && window.selectedEmojiNames.blue) ? window.selectedEmojiNames.blue : (EMOJI_TO_NAME[blueEmoji] || 'Blue Team');
+  const redLabel = `Red ${redName}`;
+  const blueLabel = `Blue ${blueName}`;
+  const scoreboardHTML = `
+    <div style="display:flex;justify-content:center;align-items:center;gap:32px;font-size:1.7em;font-weight:bold;letter-spacing:1px;">
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:1.2em;font-weight:700;display:inline-block;">${redLabel}</span>
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:2.2em;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-top:4px;">${scores.red}</span>
+      </div>
+      <span style="font-size:1.6em;color:#fff;background:rgba(255,255,255,0.06);padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;">VS</span>
+      <div style="display:flex;flex-direction:column;align-items:center;">
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:1.2em;font-weight:700;display:inline-block;">${blueLabel}</span>
+        <span style="background:rgba(255,255,255,0.06);color:#fff;padding:8px 24px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-size:2.2em;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-top:4px;">${scores.blue}</span>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:1em;color:#fff;background:rgba(255,255,255,0.06);padding:6px 18px;border-radius:8px;border:1px solid rgba(255,255,255,0.18);font-weight:700;display:inline-block;">Turn: <b>${currentPlayer==='red'? redLabel : blueLabel}</b>${chainMode ? ' — <span style="color:#ffd26b;font-weight:bold;">Chain Attack!</span>' : ''}${chainAllowLastMove ? ' — <span style="color:#ffd26b;font-weight:bold;">Final move allowed</span>' : ''}</div>
+  `;
+  if (msg) {
+    status.innerHTML = `<div>${msg}</div>` + scoreboardHTML;
+    return;
+  }
+  status.innerHTML = scoreboardHTML;
+}
+
+function makePawn(color){
+  const pawn = document.createElement('div');
+  pawn.className = 'pawn';
+  pawn.draggable = true;
+  pawn.dataset.color = color;
+  const face = document.createElement('span');
+  face.className = 'pface';
+  // Use selected emojis when available
+  const redEmoji = (window.selectedEmoji && window.selectedEmoji.red) ? window.selectedEmoji.red : '🐲';
+  const blueEmoji = (window.selectedEmoji && window.selectedEmoji.blue) ? window.selectedEmoji.blue : '🦄';
+  face.textContent = color === 'red' ? redEmoji : blueEmoji;
+  pawn.appendChild(face);
+
+  function pauseIdle(){ pawn.classList.remove('idle'); }
+  function resumeIdle(){ if(prefersReducedMotion) return; setTimeout(()=> { if(!pawn.classList.contains('dragging') && document.contains(pawn)) pawn.classList.add('idle'); }, 60); }
+
+  let swipeStart = null;
+  let swipeTimer = null;
+
+  pawn.addEventListener('dragstart', (ev) => {
+    pauseIdle();
+    if(chainMode && chainPawn){
+      const cpCell = chainPawn.parentElement;
+      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+        // Instead of immediately ending the chain, allow the chain pawn one
+        // final non-capture decision. Mark that allowance and persist state.
+        if(pawn === chainPawn){
+          chainAllowLastMove = true;
+          // snapshot this state (not counted as an extra move)
+          recordSnapshot({ countAsMove: false });
+        } else {
+          // non-chain pawn may not move
+          dragged = null;
+          ev.preventDefault();
+          resumeIdle();
+          return;
+        }
+      }
+      if (pawn !== chainPawn) { ev.preventDefault(); resumeIdle(); return; }
+    }
+    if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); resumeIdle(); return; }
+    dragged = pawn; pawn.classList.add('dragging');
+    try { ev.dataTransfer.setData('text/plain','drag'); } catch(e){}
+  });
+  pawn.addEventListener('dragend', () => { pawn.classList.remove('dragging'); resumeIdle(); });
+
+  pawn.addEventListener('pointerdown', (ev) => {
+    pauseIdle();
+    if(chainMode && chainPawn){
+      const cpCell = chainPawn.parentElement;
+      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+        if(pawn === chainPawn){
+          chainAllowLastMove = true;
+          recordSnapshot({ countAsMove: false });
+        } else {
+          resumeIdle();
+          return;
+        }
+      }
+      if (pawn !== chainPawn) { resumeIdle(); return; }
+    }
+    if (pawn.dataset.color !== currentPlayer) { resumeIdle(); return; }
+
+    try { pawn.setPointerCapture && pawn.setPointerCapture(ev.pointerId); } catch(e){}
+    dragged = pawn;
+    pawn.classList.add('dragging');
+
+    swipeStart = { x: ev.clientX, y: ev.clientY, t: Date.now(), pointerId: ev.pointerId };
+    clearTimeout(swipeTimer);
+    swipeTimer = setTimeout(()=> { swipeStart = null; }, SWIPE_MAX_TIME + 40);
+  });
+
+  pawn.addEventListener('pointermove', (ev) => {
+    if(!swipeStart) return;
+    if(swipeStart.pointerId != null && ev.pointerId !== swipeStart.pointerId) return;
+  });
+
+  pawn.addEventListener('pointerup', (ev) => {
+    try { pawn.releasePointerCapture && pawn.releasePointerCapture(ev.pointerId); } catch(e){}
+    if(swipeStart && swipeStart.pointerId != null && ev.pointerId === swipeStart.pointerId){
+      const dt = Date.now() - swipeStart.t;
+      const dx = ev.clientX - swipeStart.x;
+      const dy = ev.clientY - swipeStart.y;
+      const dist = Math.hypot(dx, dy);
+      if(dist >= SWIPE_MIN_DIST && dt <= Math.max(SWIPE_MAX_TIME, dt)){
+        const delta = angleToCellDelta(dx, dy);
+        if(delta){
+          const fromCell = pawn.parentElement;
+          if(fromCell){
+            const fromIdx = Number(fromCell.dataset.index);
+            const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+            const tx = fx + delta.dx, ty = fy + delta.dy;
+            if(tx >= 0 && tx < 5 && ty >= 0 && ty < 5){
+              const toIdx = ty * 5 + tx;
+              const targetCell = board.children[toIdx];
+              if(targetCell){
+                const existing = targetCell.querySelector('.pawn');
+                if(chainMode && chainPawn && Math.abs(delta.dx) === 1 && Math.abs(delta.dy) === 1){
+                  if(!(existing && existing.dataset.color !== pawn.dataset.color)){
+                    // allow diagonal non-capture swipe during a chain if one of the
+                    // orthogonal adjacent tiles is empty (so the pawn can step around)
+                    const fromIdx = Number(pawn.parentElement.dataset.index);
+                    const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+                    const tx = fx + delta.dx, ty = fy + delta.dy;
+                    const adj1 = board.children[fy * 5 + tx];
+                    const adj2 = board.children[ty * 5 + fx];
+                    const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+                    const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+                    // allow stepping back to the previous square of the chain pawn
+                    const toIdx = ty * 5 + tx;
+                    if(toIdx === chainPrevIdx){
+                      // permitted if the previous square is empty (it should be empty because pawn moved)
+                    } else if(!(adj1Empty || adj2Empty || chainAllowLastMove)){
+                      swipeStart = null;
+                      setTimeout(()=> pawn.classList.remove('dragging'), 40);
+                      resumeIdle();
+                      return;
+                    }
+                  }
+                }
+                const dxCells = Math.abs(tx - fx), dyCells = Math.abs(ty - fy);
+                if(isValidMove(dxCells, dyCells) || canDoubleStep(pawn, fromIdx, toIdx)){
+                  try { handleDrop(new Event('swipe-drop'), targetCell); } catch(e){}
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    swipeStart = null;
+    clearTimeout(swipeTimer);
+    setTimeout(()=> pawn.classList.remove('dragging'),40);
+    resumeIdle();
+    pawn.style.transform = '';
+  });
+
+  pawn.__enableIdleAfterAppend = () => enableIdleAfterFrame(pawn);
+
+  return pawn;
+}
+
+// Init
+function init(){
+  board.innerHTML = '';
+  for(let i=0;i<25;i++){
+    const cell = document.createElement('div');
+    cell.className = 'cell ' + (((Math.floor(i/5) + i%5) % 2 === 0) ? 'white' : 'black');
+    cell.dataset.index = i;
+    cell.addEventListener('click', ()=> onCellClick(cell));
+    cell.addEventListener('dragover', e=>e.preventDefault());
+    cell.addEventListener('drop', e=> handleDrop(e, cell));
+    board.appendChild(cell);
+  }
+  resetBoard();
+}
+
+resetBtn.addEventListener('click', () => resetBoard());
+undoBtn.addEventListener('click', () => undo());
+redoBtn.addEventListener('click', () => redo());
+
+// New button: refresh the page
+const newBtn = document.getElementById('newBtn');
+if(newBtn){ newBtn.addEventListener('click', ()=> { try{ window.location.reload(); }catch(e){ location.reload(); } }); }
+
+// AI toggle UI wiring (now an accessible on/off toggle)
+const aiToggleBtn = document.getElementById('aiToggleBtn');
+if(aiToggleBtn){
+  aiToggleBtn.classList.add('toggle-btn');
+  function setAiBtnState(){
+    aiToggleBtn.setAttribute('aria-pressed', aiEnabled ? 'true' : 'false');
+    aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'AI: Off';
+    aiToggleBtn.classList.toggle('toggle-on', aiEnabled);
+    aiToggleBtn.classList.toggle('toggle-off', !aiEnabled);
+  }
+  // initialize state
+  setAiBtnState();
+  aiToggleBtn.addEventListener('click', ()=>{
+    aiEnabled = !aiEnabled;
+    // if turning off, cancel any scheduled AI timer immediately
+    if(!aiEnabled && _aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+    setAiBtnState();
+    // when enabled and it's AI's turn, schedule it
+    if(aiEnabled) scheduleAiIfNeeded(320);
+  });
+}
+
+
+// Rules Overlay HTML
+const rulesOverlay = document.createElement('div');
+rulesOverlay.id = 'rulesOverlay';
+rulesOverlay.className = 'rules-overlay';
+rulesOverlay.setAttribute('aria-hidden', 'true');
+rulesOverlay.innerHTML = `
+  <div class="rules-modal">
+    <button class="rules-close" id="rulesCloseBtn" aria-label="Close Rules">&times;</button>
+    <div class="rules-box" style="min-width:420px; min-height:160px;">
+      <h1>Welcome to Tic-Tac-Attack! 👋</h1>
+      <p>A game that combines pawns from chess with tic-tac-toe! Here are the rules. ♟️</p>
+      <ol>
+        <li>) You are allowed one move per turn. ➡️</li>
+        <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
+        <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
+        <li>) Capturing a piece allows that piece capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
+        <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
+        <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
+        <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
+      </ol>
+    </div>
+  </div>
+`;
+document.body.appendChild(rulesOverlay);
+
+// Credits Overlay HTML (visually identical to rules overlay but no text)
+const creditsOverlay = document.createElement('div');
+creditsOverlay.id = 'creditsOverlay';
+creditsOverlay.className = 'rules-overlay';
+creditsOverlay.setAttribute('aria-hidden', 'true');
+creditsOverlay.innerHTML = `
+  <div class="rules-modal">
+    <button class="rules-close" id="creditsCloseBtn" aria-label="Close Credits">&times;</button>
+    <div class="credits-box" style="min-width:320px; min-height:120px;">
+      <h1 style="margin-top:0;">Credits</h1>
+      <p style="margin:8px 0 6px 0;"><strong>Developer:</strong> Edward Frosch A.K.A. Roachclip 🪳</p>
+      <p style="margin:6px 0;"><strong>Bug Tester:</strong> Istillloveyou ❤️</p>
+      <p style="margin:6px 0 0 0;"><strong>Bug Tester:</strong> Pyranto 🔥</p>
+    </div>
+  </div>
+`;
+document.body.appendChild(creditsOverlay);
+
+// Rules Overlay CSS
+const rulesStyle = document.createElement('style');
+rulesStyle.textContent = `
+  .rules-overlay {
+    position: fixed; inset: 0; z-index: 9998; display: flex; align-items: center; justify-content: center;
+    background: rgba(6,6,6,0.68); opacity: 0; pointer-events: none; transition: opacity 220ms ease;
+  }
+  .rules-overlay.show { opacity: 1; pointer-events: auto; }
+  .rules-modal {
+    background: #000; color: #fff; border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    padding: 28px 28px 20px 28px;
+    /* size the modal to fit its text content while respecting small viewports */
+    width: max-content;
+    display: inline-block;
+    text-align: left;
+    max-width: 92vw;
+    font-family: system-ui,Segoe UI,Arial;
+    position: relative;
+    animation: rulesPopIn 0.22s cubic-bezier(.6,1.6,.4,1) 1;
+  }
+  .rules-modal h1 { margin-top: 0; font-size: 1.5em; }
+  .rules-modal ol { margin-top: 8px; }
+  .rules-close {
+    position: absolute; top: 6px; right: 16px; background: none; border: none; font-size: 2em; color: #ddd; cursor: pointer;
+    transition: color 0.18s; z-index: 1;
+  }
+  .rules-close:hover { color: #fff; }
+  @keyframes rulesPopIn {
+    0% { transform: scale(0.92) translateY(24px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  /* Curved white border around credits text */
+  #creditsOverlay .credits-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    /* ensure the modal close button doesn't overlap the credits box */
+    margin-top: calc(24px * var(--scale));
+    text-align: center;
+    min-width: 380px;
+    min-height: 160px;
+  }
+  #creditsOverlay .credits-box h1{
+    margin-top: 0;
+    margin-bottom: 10px;
+    font-size: 1.25em;
+    text-decoration: underline;
+    text-decoration-thickness: 2px;
+    text-underline-offset: 6px;
+  }
+  /* confetti elements that float up and fade */
+  .credits-confetti-container{ position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .credit-confetti{
+    position: absolute;
+    bottom: 8%;
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+    display: inline-block;
+    animation: confettiRise 2.6s ease-in forwards;
+  }
+  @keyframes confettiRise{
+    0%{ opacity: 0; transform: translateY(0) rotate(0deg); }
+    10%{ opacity: 1; }
+    100%{ opacity: 0; transform: translateY(-220px) rotate(420deg); }
+  }
+  /* Make the credits modal slightly larger and more spacious on wider viewports */
+  #creditsOverlay .rules-modal{
+    width: min(560px, 92vw);
+    padding: 36px;
+  }
+  /* Curved white border for rules content (match credits box styling) */
+  #rulesOverlay .rules-box{
+    border: 1px solid rgba(255,255,255,0.92);
+    border-radius: 14px;
+    padding: calc(14px * var(--scale)) calc(16px * var(--scale));
+    background: rgba(255,255,255,0.02);
+    margin-top: calc(24px * var(--scale));
+    text-align: left;
+  }
+  #rulesOverlay .rules-box h1{ margin-top: 0; margin-bottom: 8px; }
+`;
+document.head.appendChild(rulesStyle);
+
+// Theme button wiring — implement a lightweight 'snow' theme
+const themeBtn = document.getElementById('themeBtn');
+if(themeBtn){
+  // ensure a theme state exists; default theme is 'flowers'
+  // default to the 'snow' theme on first load
+  if(!window.currentTheme) window.currentTheme = 'snow';
+
+  // inject theme CSS for snow and space themes (scoped to body classes)
+  if(!document.getElementById('themeStyles')){
+    const ts = document.createElement('style');
+    ts.id = 'themeStyles';
+    ts.textContent = `
+      /* Theme 'snow' uses a dark blue gradient for a night/snow look */
+      body.theme-snow {
+        background: linear-gradient(180deg, #021024 0%, #02284a 45%, #06305f 100%);
+      }
+      /* Theme 'space' uses a very dark grey gradient to emulate deep space */
+      body.theme-space {
+        background: linear-gradient(180deg, #0b0b0b 0%, #111216 45%, #19191c 100%);
+      }
+    `;
+    document.head.appendChild(ts);
+  }
+
+  function setTheme(t){
+    window.currentTheme = t || 'flowers';
+    // clear any theme classes first
+    document.body.classList.remove('theme-snow');
+    document.body.classList.remove('theme-space');
+    if(window.currentTheme === 'snow'){
+      document.body.classList.add('theme-snow');
+      window.currentFlowerEmojis = ['❄️'];
+    } else if(window.currentTheme === 'space'){
+      document.body.classList.add('theme-space');
+      // use a single star emoji for space theme
+      window.currentFlowerEmojis = ['⭐'];
+    } else {
+      // Flowers theme: use default floral emojis
+      window.currentFlowerEmojis = null;
+    }
+    // reinitialize flowers to pick up emoji change
+    try{ if(typeof initFlowers === 'function') initFlowers(); }catch(e){}
+    // keep the button label static
+    themeBtn.textContent = 'Theme';
+  }
+
+  // cycle theme on click: Flowers -> Snow -> Space -> Flowers
+  themeBtn.addEventListener('click', ()=>{
+    const next = window.currentTheme === 'flowers' ? 'snow' : (window.currentTheme === 'snow' ? 'space' : 'flowers');
+    setTheme(next);
+  });
+
+  // ensure the button always reads 'Theme'
+  themeBtn.textContent = 'Theme';
+  // apply the initial theme immediately so the page loads using the default
+  // (e.g., 'snow') instead of waiting for the user to click the button.
+  try{ setTheme(window.currentTheme); }catch(e){ /* ignore if setTheme not defined */ }
+}
+
+// Rules Overlay JS
+const rulesBtn = document.getElementById('rulesBtn');
+if(rulesBtn){
+  rulesBtn.addEventListener('click', ()=>{
+    rulesOverlay.classList.add('show');
+    rulesOverlay.setAttribute('aria-hidden', 'false');
+  });
+}
+document.getElementById('rulesCloseBtn').onclick = ()=>{
+  rulesOverlay.classList.remove('show');
+  rulesOverlay.setAttribute('aria-hidden', 'true');
+};
+
+const creditsBtn = document.getElementById('creditsBtn');
+if(creditsBtn){
+  creditsBtn.addEventListener('click', ()=>{
+    const el = document.getElementById('creditsOverlay');
+    if(!el) return;
+    // show overlay and launch a small confetti animation
+    el.classList.add('show');
+    el.setAttribute('aria-hidden', 'false');
+    launchCreditsConfetti(el);
+  });
+}
+const creditsClose = document.getElementById('creditsCloseBtn');
+if(creditsClose){
+  creditsClose.onclick = ()=>{
+    const el = document.getElementById('creditsOverlay');
+    if(!el) return;
+    el.classList.remove('show');
+    el.setAttribute('aria-hidden', 'true');
+    clearCreditsConfetti(el);
+  };
+}
+
+// Small confetti animation for the credits overlay
+function launchCreditsConfetti(overlay){
+  try{
+    clearCreditsConfetti(overlay);
+    const container = document.createElement('div');
+    container.className = 'credits-confetti-container';
+    // create a handful of emoji confetti
+    const emojis = ['✨','🪶','🎉','⭐','🌟','🪳'];
+    for(let i=0;i<28;i++){
+      const s = document.createElement('span');
+      s.className = 'credit-confetti';
+      s.textContent = emojis[Math.floor(Math.random()*emojis.length)];
+      // randomize starting position
+      s.style.left = (10 + Math.random()*80) + '%';
+      s.style.animationDelay = (Math.random()*0.6) + 's';
+      s.style.fontSize = (14 + Math.random()*18) + 'px';
+      container.appendChild(s);
+    }
+    overlay.appendChild(container);
+    // store reference for cleanup
+    overlay._confettiContainer = container;
+  }catch(e){ console.warn('confetti error', e); }
+}
+
+function clearCreditsConfetti(overlay){
+  try{
+    if(!overlay) return;
+    const c = overlay._confettiContainer;
+    if(c && c.parentNode) c.parentNode.removeChild(c);
+    overlay._confettiContainer = null;
+  }catch(e){ /* ignore */ }
+}
+
+init();
+if (typeof initFlowers === 'function') initFlowers();
+window.addEventListener('load', () => { if (typeof initFlowers === 'function') initFlowers(); });
+
+// debug helpers
+window.__PE = { undoStack, redoStack, takeSnapshot: ()=> undoStack[undoStack.length-1], applySnapshot, countPawns };
+
+// --- Multiplayer client (lightweight WebSocket integration) ---
+(function(){
+  const M = window.multiplayer = { ws: null, connected: false, room: null, name: null };
+
+  function createOverlay(){
+    const overlay = document.createElement('div');
+    overlay.id = 'multiplayerOverlay';
+    overlay.className = 'rules-overlay';
+    overlay.setAttribute('aria-hidden','true');
+    overlay.innerHTML = `
+      <div class="rules-modal">
+        <button class="rules-close" id="multiplayerCloseBtn" aria-label="Close">&times;</button>
+        <h1>Multiplayer</h1>
+        <div style="min-width:360px;">
+          <div style="margin:8px 0;text-align:center;"><input id="multiName" placeholder="Your name" style="padding:8px 10px;width:92%"/></div>
+          <div style="margin:8px 0;text-align:center;"><input id="multiRoom" placeholder="Room ID (leave blank for default)" style="padding:8px 10px;width:92%"/></div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+            <button id="multiConnectBtn">Connect</button>
+            <button id="multiJoinBtn">Join Room</button>
+            <button id="multiReqStateBtn">Request State</button>
+          </div>
+          <div id="multiStatus" style="margin-top:12px;text-align:center;color:#ddd;font-size:0.95em"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    document.getElementById('multiplayerCloseBtn').onclick = ()=>{ overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); };
+    return overlay;
+  }
+
+  const overlay = createOverlay();
+
+  function updateStatus(msg){ const s = document.getElementById('multiStatus'); if(s) s.textContent = msg || ''; }
+
+  M.connect = function(url){
+    if(M.ws) try{ M.ws.close(); }catch(e){}
+    M.ws = new WebSocket(url || 'ws://localhost:3000');
+    M.ws.onopen = ()=>{ M.connected = true; updateStatus('Connected to server'); };
+    M.ws.onclose = ()=>{ M.connected = false; updateStatus('Disconnected'); };
+    M.ws.onerror = (e)=>{ console.warn('ws err', e); updateStatus('Connection error'); };
+    M.ws.onmessage = (ev)=>{
+      try{ const msg = JSON.parse(ev.data); handleServerMessage(msg); }catch(e){ console.warn('bad msg', e); }
+    };
+  };
+
+  M.join = function(room, name){ if(!M.ws || M.ws.readyState !== WebSocket.OPEN){ updateStatus('Not connected'); return; } M.room = room || 'default'; M.name = name || 'Player'; M.ws.send(JSON.stringify({ type:'join', room: M.room, name: M.name })); updateStatus('Joining ' + M.room); };
+
+  M.sendSnapshot = function(snapshot){ if(!M.ws || M.ws.readyState !== WebSocket.OPEN) return; try{ M.ws.send(JSON.stringify({ type:'snapshot', room: M.room || 'default', snapshot })); }catch(e){ console.warn('send snap', e); } };
+
+  function handleServerMessage(msg){
+    if(!msg || !msg.type) return;
+    if(msg.type === 'joined'){ updateStatus('Joined room ' + (msg.room||'default') + ' — players: ' + (msg.players||1)); }
+    else if(msg.type === 'opponentJoined'){ updateStatus((msg.name||'Opponent') + ' joined'); }
+    else if(msg.type === 'snapshot' || msg.type === 'state'){
+      if(msg.snapshot){ try{ suppressSnapshots = true; applySnapshot(msg.snapshot); suppressSnapshots = false; updateStatus('Applied remote state'); }catch(e){ console.warn('apply remote', e); suppressSnapshots = false; } }
+    }
+    else if(msg.type === 'opponentLeft'){ updateStatus((msg.name||'Opponent') + ' left'); }
+    else if(msg.type === 'error'){ updateStatus('Server error: ' + (msg.message||msg.error||'')); }
+  }
+
+  // wire overlay buttons
+  document.getElementById('multiConnectBtn').addEventListener('click', ()=>{ const url = prompt('WebSocket URL','ws://localhost:3000'); if(url) M.connect(url); });
+  document.getElementById('multiJoinBtn').addEventListener('click', ()=>{ const name = document.getElementById('multiName').value || 'Player'; const room = document.getElementById('multiRoom').value || 'default'; M.join(room, name); });
+  document.getElementById('multiReqStateBtn').addEventListener('click', ()=>{ if(M.ws && M.ws.readyState === WebSocket.OPEN){ M.ws.send(JSON.stringify({ type:'requestState', room: M.room||'default' })); updateStatus('Requested state'); } });
+
+  // add an in-UI button to open the multiplayer overlay
+  try{
+    const host = document.querySelector('.tertiary-actions') || document.getElementById('controls');
+    if(host){ const btn = document.createElement('button'); btn.id = 'multiplayerBtn'; btn.textContent = 'Multiplayer'; btn.addEventListener('click', ()=>{ overlay.classList.add('show'); overlay.setAttribute('aria-hidden','false'); }); host.appendChild(btn); }
+  }catch(e){ /* ignore */ }
+
+})();
+</script>
+</body>
+</html>
