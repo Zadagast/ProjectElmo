@@ -1015,6 +1015,15 @@ function handleRematchUpdate(rematchObj){
         sendSnapshotToRoom(snap).then(()=>{
           // clear rematch requests after successful reset
           clearRematchRequests().catch(e=>{});
+          // hide victory/defeat overlay for a clean rematch start
+          try{
+            const overlay = document.getElementById('victoryOverlay');
+            if(overlay){ overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); }
+            try{ board.style.pointerEvents = ''; }catch(e){}
+            try{ stopVictoryTune(); }catch(e){}
+            const remEl = document.getElementById('rematchStatus'); if(remEl) remEl.textContent = '';
+            const restartBtn = document.getElementById('victoryRestart'); if(restartBtn){ restartBtn.disabled = false; restartBtn.textContent = 'Rematch'; }
+          }catch(e){ console.warn('rematch: failed to hide overlay', e); }
         }).catch(e=>{ console.warn('rematch: failed to send reset snapshot', e); });
       }catch(e){ console.warn('rematch handling reset err', e); }
     }
