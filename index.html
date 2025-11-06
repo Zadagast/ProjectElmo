@@ -864,9 +864,9 @@ function listenRoom(roomId){
   const statePath = 'rooms/' + roomId + '/state';
   // Listen only to the /state child for a simple, reliable sync model
   _roomListenerUnsubscribe = window.__pe_firebase_mod.onValue(statePath, snap => {
-    const state = snap.val();
-    console.log('multiplayer: state update on', statePath, state);
-    if(!state) return;
+  const state = snap.val();
+  console.log('multiplayer: state update on', statePath, state);
+  if(!state) return;
     try{
       // By default ignore updates authored by this client to avoid
       // re-applying our own writes. For debugging, a bypass flag can be
@@ -884,6 +884,12 @@ function listenRoom(roomId){
     try{
       if(state.board || typeof state.currentPlayer === 'string'){
         applySnapshot(state);
+        // If the remote snapshot marks gameOver, show the end overlay (victory/defeat)
+        try{
+          if(state.gameOver && typeof state.winner === 'string'){
+            showEndOverlay(state.winner);
+          }
+        }catch(e){ console.warn('listenRoom: showEndOverlay failed', e); }
       } else {
         console.warn('multiplayer: remote state missing expected fields', state);
       }
@@ -2544,8 +2550,20 @@ function endGame(playerColor){
   updateStatus('');
   // freeze board UI by replacing nodes with clones (preserves visuals, removes listeners)
   board.querySelectorAll('.cell').forEach(cell => { cell.replaceWith(cell.cloneNode(true)); });
-  // show victory overlay and play short melodic tune
-  try{ showVictory(playerColor); playVictoryTune(playerColor); }catch(e){ console.warn('victory UI error', e); }
+  // In multiplayer, publish the gameOver state so the other client shows defeat
+  try{
+    if(typeof multiplayerRoomId === 'string' && multiplayerRoomId){
+      try{
+        const snap = takeSnapshot();
+        snap.gameOver = true; snap.winner = playerColor;
+        // send authoritative end-game snapshot to room
+        sendSnapshotToRoom(snap).catch(e=>{ console.warn('send endGame snapshot failed', e); });
+      }catch(e){ console.warn('endGame: failed to send snapshot', e); }
+    }
+  }catch(e){ console.warn('endGame multiplayer publish err', e); }
+
+  // show victory/defeat overlay locally
+  try{ showEndOverlay(playerColor); }catch(e){ console.warn('victory UI error', e); }
 }
 
 // Victory UI + tune
@@ -2573,8 +2591,72 @@ function showVictory(playerColor){
 
   const restart = document.getElementById('victoryRestart');
   const close = document.getElementById('victoryClose');
-  if(restart) restart.onclick = ()=>{ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; resetBoard(); };
-  if(close) close.onclick = ()=>{ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; };
+  if(restart) restart.onclick = ()=>{
+    try{ stopVictoryTune(); }catch(e){}
+    overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = '';
+    // In multiplayer, start a rematch by resetting local board and sending the snapshot to room
+    if(multiplayerRoomId){
+      try{
+        resetBoard();
+        const snap = takeSnapshot();
+        // clear any gameOver marker
+        snap.gameOver = false; snap.winner = null;
+        sendSnapshotToRoom(snap).catch(e=>{ console.warn('rematch send failed', e); });
+        return;
+      }catch(e){ console.warn('multiplayer rematch failed', e); }
+    }
+    // fallback single-player behavior
+    resetBoard();
+  };
+  if(close) close.onclick = ()=>{ try{ stopVictoryTune(); }catch(e){} overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; };
+}
+
+// Unified end overlay for multiplayer: show victory to winner and defeat to loser
+function showEndOverlay(winnerColor){
+  const overlay = document.getElementById('victoryOverlay');
+  const emoji = document.getElementById('victoryEmoji');
+  const title = document.getElementById('victoryTitle');
+  const txt = document.getElementById('victoryText');
+  if(!overlay) return;
+  const redEmoji = (window.selectedEmoji && window.selectedEmoji.red) ? window.selectedEmoji.red : '🐲';
+  const blueEmoji = (window.selectedEmoji && window.selectedEmoji.blue) ? window.selectedEmoji.blue : '🦄';
+  const redName = (window.selectedEmojiNames && window.selectedEmojiNames.red) ? window.selectedEmojiNames.red : (EMOJI_TO_NAME[redEmoji] || 'Red Team');
+  const blueName = (window.selectedEmojiNames && window.selectedEmojiNames.blue) ? window.selectedEmojiNames.blue : (EMOJI_TO_NAME[blueEmoji] || 'Blue Team');
+  const winnerLabel = winnerColor === 'red' ? `Red ${redName}` : `Blue ${blueName}`;
+  const isWinner = (myPlayerColor && myPlayerColor === winnerColor);
+
+  // Set emoji and texts
+  emoji.textContent = winnerColor === 'red' ? redEmoji : blueEmoji;
+  if(multiplayerRoomId){
+    if(isWinner){
+      title.textContent = `${winnerLabel} Wins!`;
+      txt.textContent = `Congrats — you captured three tiles in a row.`;
+      try{ playVictoryTune(winnerColor); }catch(e){}
+    } else {
+      title.textContent = `Defeat`;
+      txt.textContent = `${winnerLabel} captured three tiles in a row. Better luck next match.`;
+    }
+  } else {
+    // single-player fall back to existing victory language
+    title.textContent = `${winnerLabel} Wins!`;
+    txt.textContent = `Congrats — ${winnerLabel} captured three tiles in a row.`;
+    try{ playVictoryTune(winnerColor); }catch(e){}
+  }
+
+  overlay.classList.add('show'); overlay.removeAttribute('aria-hidden');
+  try{ board.style.pointerEvents = 'none'; }catch(e){}
+
+  const restart = document.getElementById('victoryRestart');
+  const close = document.getElementById('victoryClose');
+  if(restart) restart.onclick = ()=>{
+    try{ stopVictoryTune(); }catch(e){}
+    overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = '';
+    if(multiplayerRoomId){
+      try{ resetBoard(); const snap = takeSnapshot(); snap.gameOver = false; snap.winner = null; sendSnapshotToRoom(snap).catch(e=>{ console.warn('rematch send failed', e); }); return; }catch(e){ console.warn('rematch failed', e); }
+    }
+    resetBoard();
+  };
+  if(close) close.onclick = ()=>{ try{ stopVictoryTune(); }catch(e){} overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; };
 }
 
 function hideVictory(){ const overlay = document.getElementById('victoryOverlay'); if(!overlay) return; overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; stopVictoryTune(); }
