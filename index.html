@@ -527,7 +527,7 @@ multiplayerModal.innerHTML = `
       <div class="host-section">
         <div style="display:flex;gap:8px;align-items:center;flex-direction:column;">
           <div style="display:flex;gap:8px;align-items:center;">
-            <button id="modalCreateRoomBtn">Create Room (host)</button>
+                <button id="modalCreateRoomBtn">Host and copy room code to send to your friend! 🔗</button>
           </div>
           <div style="display:flex;gap:12px;align-items:center;margin-top:8px;" class="host-color-choice">
             <span class="info">Host plays as:</span>
@@ -536,33 +536,16 @@ multiplayerModal.innerHTML = `
           </div>
         </div>
         
-        <div id="createdRoom" class="host-result" style="display:none;margin-top:8px;">
-          <span class="info">Room ID:</span>
-          <code id="createdRoomId"></code>
-          <button id="copyRoomBtn">Copy</button>
-        </div>
+        <!-- created room id and copy button removed -->
       </div>
       <hr>
-      <div class="join-section">
-        <input id="joinRoomInput" type="text" placeholder="Paste room id to join" />
-        <div style="display:flex;gap:8px;margin-top:6px;"><button id="modalJoinRoomBtn">Join Room</button><div id="multiplayerStatus" class="info"></div></div>
+      <div class="join-section" style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <input id="joinRoomInput" type="text" placeholder="Paste room id to join" style="width:80%;max-width:420px;" />
+        <button id="modalJoinRoomBtn">Join Room</button>
+        <div id="multiplayerStatus" class="info" style="text-align:center;margin-top:6px;min-height:18px;width:80%;max-width:420px;"></div>
       </div>
       <hr>
-      <div class="lobby-section">
-        <h4 style="margin:0">Lobby</h4>
-        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
-          <button id="modalCreateLobbyBtn">Create Lobby</button>
-          <button id="modalRefreshLobbiesBtn">Refresh</button>
-        </div>
-        <div id="createdLobby" class="host-result" style="display:none;margin-top:8px;gap:8px;align-items:center;">
-          <span class="info">Lobby ID:</span>
-          <code id="createdLobbyId"></code>
-          <button id="copyLobbyBtn">Copy</button>
-          <button id="startMatchBtn" style="display:none;background:#0b6bff;color:#fff;border:none;padding:6px 10px;border-radius:8px;">Start Match</button>
-        </div>
-        <div id="lobbiesList" style="margin-top:12px;max-height:260px;overflow:auto;border-top:1px dashed #eee;padding-top:8px"></div>
-        <div id="lobbyPlayers" style="margin-top:8px;display:none;border-top:1px dashed #eee;padding-top:8px"></div>
-      </div>
+      <!-- Lobby section removed per user request (Create Lobby / Refresh) -->
       <div style="display:flex;justify-content:center;margin-top:10px;">
         <button id="modalCloseBtn" style="background:#d33;color:#fff;padding:8px 12px;border-radius:8px;border:none;">Close</button>
       </div>
@@ -612,9 +595,6 @@ const multiplayerClose = document.getElementById('multiplayerClose');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalCreateRoomBtn = document.getElementById('modalCreateRoomBtn');
 const modalJoinRoomBtn = document.getElementById('modalJoinRoomBtn');
-const createdRoomContainer = document.getElementById('createdRoom');
-const createdRoomId = document.getElementById('createdRoomId');
-const copyRoomBtn = document.getElementById('copyRoomBtn');
 const joinRoomInput = document.getElementById('joinRoomInput');
 const multiplayerStatus = document.getElementById('multiplayerStatus');
 const modalCreateLobbyBtn = document.getElementById('modalCreateLobbyBtn');
@@ -627,7 +607,7 @@ const copyLobbyBtn = document.getElementById('copyLobbyBtn');
 const startMatchBtn = document.getElementById('startMatchBtn');
 
 function showMultiplayerModal(){ multiplayerModal.classList.add('show'); multiplayerModal.setAttribute('aria-hidden','false'); }
-function hideMultiplayerModal(){ multiplayerModal.classList.remove('show'); multiplayerModal.setAttribute('aria-hidden','true'); try{ createdRoomContainer.style.display='none'; }catch(e){} try{ if(createdLobbyContainer) createdLobbyContainer.style.display='none'; }catch(e){} multiplayerStatus.textContent=''; }
+function hideMultiplayerModal(){ multiplayerModal.classList.remove('show'); multiplayerModal.setAttribute('aria-hidden','true'); try{ if(createdLobbyContainer) createdLobbyContainer.style.display='none'; }catch(e){} multiplayerStatus.textContent=''; }
 
 // wire top-level Host/Join buttons to open modal
 const hostRoomBtn = document.getElementById('hostRoomBtn');
@@ -638,10 +618,7 @@ if(joinRoomBtn) joinRoomBtn.addEventListener('click', ()=>{ showMultiplayerModal
 multiplayerClose && multiplayerClose.addEventListener('click', hideMultiplayerModal);
 modalCloseBtn && modalCloseBtn.addEventListener('click', hideMultiplayerModal);
 
-copyRoomBtn && copyRoomBtn.addEventListener('click', ()=>{
-  try{ navigator.clipboard.writeText(createdRoomId.textContent || '').then(()=>{ multiplayerStatus.textContent = 'Copied!'; setTimeout(()=> multiplayerStatus.textContent = '', 1500); }); }catch(e){ /* ignore */ }
-});
-
+// copyRoomBtn removed (no created room UI). copyLobbyBtn remains for lobbies.
 copyLobbyBtn && copyLobbyBtn.addEventListener('click', ()=>{
   try{ navigator.clipboard.writeText(createdLobbyId.textContent || '').then(()=>{ multiplayerStatus.textContent = 'Lobby copied!'; setTimeout(()=> multiplayerStatus.textContent = '', 1500); }); }catch(e){ /* ignore */ }
 });
@@ -731,9 +708,12 @@ modalCreateRoomBtn && modalCreateRoomBtn.addEventListener('click', ()=>{
   let hostColor = 'red';
   try{ const sel = document.querySelector('input[name="hostColor"]:checked'); if(sel && sel.value) hostColor = sel.value; }catch(e){}
   createRoom(snap, hostColor).then(roomId=>{
-    createdRoomContainer.style.display = 'flex';
-    createdRoomId.textContent = roomId || multiplayerRoomId || '';
-    multiplayerStatus.textContent = 'Room created';
+    // Paste the created room id into the join input and copy it to clipboard for easy sharing
+    try{ if(joinRoomInput) joinRoomInput.value = roomId || multiplayerRoomId || ''; }catch(e){}
+    try{ if(navigator && navigator.clipboard && roomId) navigator.clipboard.writeText(roomId); }catch(e){}
+    multiplayerStatus.textContent = 'Room created (id copied)';
+    // createRoom already sets multiplayerRoomId and starts listening; close modal briefly
+    setTimeout(hideMultiplayerModal, 500);
   }).catch(e=>{ multiplayerStatus.textContent = 'Create failed'; console.warn(e); });
 });
 
@@ -1723,6 +1703,14 @@ function updateUndoRedoButtons(){
       else { undoBtn.style.display = ''; redoBtn.style.display = ''; }
     }
   }catch(e){ /* ignore UI update errors */ }
+
+  // Also hide the AI toggle while in multiplayer to avoid enabling AI mid-match
+  try{
+    if(typeof aiToggleBtn !== 'undefined' && aiToggleBtn){
+      if(inMultiplayer){ aiToggleBtn.style.display = 'none'; aiToggleBtn.setAttribute('aria-hidden','true'); }
+      else { aiToggleBtn.style.display = ''; aiToggleBtn.setAttribute('aria-hidden','false'); }
+    }
+  }catch(e){}
 
   // Keep disabled state consistent for accessibility even when hidden
   try{ undoBtn.disabled = inMultiplayer || undoStack.length <= 1; }catch(e){}
