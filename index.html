@@ -1007,12 +1007,6 @@ function handleRematchUpdate(rematchObj){
     if(hostAgreed && guestAgreed){
       // reset local flag
       _myRematchRequested = false;
-      // close the overlay immediately so both players return to the board
-      try{
-        const overlay = document.getElementById('victoryOverlay');
-        if(overlay){ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); }
-      }catch(e){ /* ignore */ }
-      try{ board.style.pointerEvents = ''; }catch(e){}
       // perform reset by sending cleared snapshot to room and clearing rematch node
       try{
         console.log('rematch: both players agreed; sending reset snapshot');
