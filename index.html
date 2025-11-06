@@ -95,6 +95,18 @@
     box-shadow: 0 8px 26px rgba(0,0,0,0.12);
   }
   @media (max-width:520px){ .tertiary-actions{ width:100%; justify-content:center } }
+  /* Multiplayer group (host/join) — separate from other controls */
+  .multiplayer-actions{
+    display:flex;
+    gap:calc(8px * var(--scale));
+    align-items:center;
+    padding:calc(6px * var(--scale));
+    border-radius:calc(10px * var(--scale));
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 8px 26px rgba(0,0,0,0.12);
+  }
+  @media (max-width:520px){ .multiplayer-actions{ width:100%; justify-content:center } }
   /* separate group just for Rules / Credits to match themed boxes */
   .rules-actions{
     display:flex;
@@ -214,6 +226,16 @@
   #multiplayerModal code{ background:rgba(0,0,0,0.04); padding:6px 8px; border-radius:6px; font-family:monospace; }
   #multiplayerModal .info{ font-size:13px; color:#333; }
   #multiplayerModal button{ background:#0b6bff; color:#fff; border:none; box-shadow:none; }
+  /* Start mode overlay should visually match other modal boxes */
+  #startModeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:9999; }
+  #startModeOverlay.show{ display:flex; }
+  /* Dark backdrop to match emoji picker and other overlays */
+  #startModeOverlay .modal-backdrop{ position:absolute; inset:0; background:rgba(6,6,6,0.72); }
+  /* Dark modal box styling to match other overlays like emoji picker */
+  #startModeOverlay .modal-box{ position:relative; z-index:2; width:min(520px, calc(92%)); background:#0b0b0b; color:#fff; border-radius:14px; border: 1px solid rgba(255,255,255,0.92); padding: calc(14px * var(--scale)) calc(16px * var(--scale)); box-shadow:0 18px 46px rgba(0,0,0,0.32); text-align:center; }
+  #startModeOverlay .modal-box h3{ margin:0 0 8px 0; font-size:18px; color:#fff; }
+  #startModeOverlay .modal-box button{ background:#000; color:#fff; border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:12px 18px; border-radius:8px; font-weight:700; }
+  #startModeOverlay .modal-box button.alt{ background:#18a058; border:none; }
   .pawn .pface { position: relative; z-index: 31; pointer-events: none; display: inline-block; line-height:1; }
 
   @keyframes pawnIdleSquashWiggle {
@@ -364,6 +386,8 @@
         <div class="tertiary-actions" aria-hidden="false">
           <button id="aiToggleBtn">Play vs AI</button>
           <button id="themeBtn">Theme</button>
+        </div>
+        <div class="multiplayer-actions" aria-hidden="false">
           <button id="hostRoomBtn">Host Online</button>
           <button id="joinRoomBtn">Join Online</button>
         </div>
@@ -487,6 +511,8 @@ const status = document.getElementById('status');
 const resetBtn = document.getElementById('resetBtn');
 const undoBtn = document.getElementById('undoBtn');
 const redoBtn = document.getElementById('redoBtn');
+// Container for undo/redo button group — used to hide the whole group during multiplayer
+const secondaryActions = document.querySelector('.secondary-actions');
 
 // Multiplayer modal DOM and wiring (replaces alert-based Host/Join UX)
 const multiplayerModal = document.createElement('div');
@@ -502,10 +528,6 @@ multiplayerModal.innerHTML = `
         <div style="display:flex;gap:8px;align-items:center;flex-direction:column;">
           <div style="display:flex;gap:8px;align-items:center;">
             <button id="modalCreateRoomBtn">Create Room (host)</button>
-            <button id="modalTestConnBtn" style="background:#5bc0a6;">Test Connection</button>
-            <button id="modalRoomDiagBtn" style="background:#f39c12;">Room Debug</button>
-            <button id="modalRefreshStateBtn" style="background:#6c757d;">Refresh Room State</button>
-            <button id="modalValidateStateBtn" style="background:#8e44ad;">Validate Room State</button>
           </div>
           <div style="display:flex;gap:12px;align-items:center;margin-top:8px;" class="host-color-choice">
             <span class="info">Host plays as:</span>
@@ -513,9 +535,7 @@ multiplayerModal.innerHTML = `
             <label style="display:inline-flex;align-items:center;gap:6px;"><input type="radio" name="hostColor" value="blue"> Blue</label>
           </div>
         </div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center;">
-          <label style="font-size:13px;display:flex;align-items:center;gap:8px;"><input type="checkbox" id="debugBypassUpdatedBy"> Bypass updatedBy ignore (debug)</label>
-        </div>
+        
         <div id="createdRoom" class="host-result" style="display:none;margin-top:8px;">
           <span class="info">Room ID:</span>
           <code id="createdRoomId"></code>
@@ -557,11 +577,11 @@ startModeOverlay.id = 'startModeOverlay';
 startModeOverlay.setAttribute('aria-hidden','true');
 startModeOverlay.innerHTML = `
   <div class="modal-backdrop"></div>
-  <div class="modal-box" role="dialog" aria-modal="true" style="text-align:center;">
+  <div class="modal-box" role="dialog" aria-modal="true">
     <h3>Choose Mode</h3>
     <div style="margin-top:12px; display:flex; gap:12px; justify-content:center;">
-      <button id="startSingleBtn" style="padding:12px 18px; background:#0b6bff; color:#fff; border:none; border-radius:8px; font-weight:700;">Single Player</button>
-      <button id="startMultiBtn" style="padding:12px 18px; background:#18a058; color:#fff; border:none; border-radius:8px; font-weight:700;">Multiplayer</button>
+      <button id="startSingleBtn">Single Player</button>
+      <button id="startMultiBtn" class="alt">Multiplayer</button>
     </div>
     <div style="margin-top:10px;font-size:13px;color:#333;">Choose Single Player to play vs AI or Multiplayer to play online.</div>
   </div>
@@ -591,9 +611,6 @@ startMultiBtn && startMultiBtn.addEventListener('click', ()=>{
 const multiplayerClose = document.getElementById('multiplayerClose');
 const modalCloseBtn = document.getElementById('modalCloseBtn');
 const modalCreateRoomBtn = document.getElementById('modalCreateRoomBtn');
-const modalTestConnBtn = document.getElementById('modalTestConnBtn');
-const modalRoomDiagBtn = document.getElementById('modalRoomDiagBtn');
-const modalRefreshStateBtn = document.getElementById('modalRefreshStateBtn');
 const modalJoinRoomBtn = document.getElementById('modalJoinRoomBtn');
 const createdRoomContainer = document.getElementById('createdRoom');
 const createdRoomId = document.getElementById('createdRoomId');
@@ -640,128 +657,15 @@ startMatchBtn && startMatchBtn.addEventListener('click', ()=>{
 });
 
 // Diagnostic: test a small write/read to the DB to confirm connectivity
-function testFirebaseConnection(){
-  multiplayerStatus.textContent = 'Testing...';
-  try{
-    initFirebaseFromWindowConfig();
-    if(!firebaseDb){ multiplayerStatus.textContent = 'Not configured'; return Promise.reject(new Error('Not configured')); }
-    const testPath = 'diagnostics/lastPing';
-    const payload = { by: myClientId, ts: Date.now() };
-    return window.__pe_firebase_mod.set(testPath, payload).then(()=>{
-      // subscribe once to confirm value
-      const unsub = window.__pe_firebase_mod.onValue(testPath, snap=>{
-        try{
-          const v = snap.val();
-          if(v && v.by === myClientId){
-            multiplayerStatus.textContent = 'Connected';
-            console.log('Firebase diagnostics success', v);
-            try{ unsub(); }catch(e){}
-            return Promise.resolve(v);
-          } else {
-            multiplayerStatus.textContent = 'Read mismatch';
-            console.warn('Firebase diagnostics read mismatch', v);
-            try{ unsub(); }catch(e){}
-            return Promise.reject(new Error('Read mismatch'));
-          }
-        }catch(e){ console.warn('diag onValue err', e); try{ unsub(); }catch(e){} }
-      });
-    }).catch(e=>{ multiplayerStatus.textContent = 'Write failed'; console.warn('diag write failed', e); throw e; });
-  }catch(e){ multiplayerStatus.textContent = 'Error'; console.warn('testFirebaseConnection err', e); return Promise.reject(e); }
-}
-
-modalTestConnBtn && modalTestConnBtn.addEventListener('click', ()=>{
-  testFirebaseConnection().catch(()=>{});
-});
+// Test connection helper removed (button removed from UI)
 
 // Room diagnostic: quick snapshot/write/read to help debug room sync issues
-function roomDiagnostic(){
-  try{
-    initFirebaseFromWindowConfig();
-    console.log('roomDiag: dbUrl=', window.__pe_firebase_mod && window.__pe_firebase_mod.dbUrl);
-    console.log('roomDiag: myClientId=', myClientId, 'multiplayerRoomId=', multiplayerRoomId);
-    if(!firebaseDb){ console.warn('roomDiag: firebase not initialized'); return; }
-    if(!multiplayerRoomId){ console.warn('roomDiag: no multiplayerRoomId set'); }
-    const roomRoot = 'rooms/' + (multiplayerRoomId || '__no_room__');
-    // listen once to the room root for immediate logging (subscribe then unsubscribe)
-    const unsub = window.__pe_firebase_mod.onValue(roomRoot, snap=>{
-      console.log('roomDiag: onValue roomRoot', roomRoot, snap.val());
-      try{ if(unsub) unsub(); }catch(e){}
-    });
-    // read state path explicitly
-    const statePath = roomRoot + '/state';
-    const testPath = roomRoot + '/diagnostics/lastPing';
-    const payload = { by: myClientId, ts: Date.now() };
-    window.__pe_firebase_mod.set(testPath, payload).then(()=>{
-      console.log('roomDiag: wrote diagnostics lastPing', testPath, payload);
-      const unsub2 = window.__pe_firebase_mod.onValue(testPath, s=>{
-        console.log('roomDiag: read back diagnostics', s.val());
-        try{ if(unsub2) unsub2(); }catch(e){}
-      });
-    }).catch(e=>{ console.warn('roomDiag: write failed', e); });
-    // also read state once
-    const unsub3 = window.__pe_firebase_mod.onValue(statePath, s=>{
-      console.log('roomDiag: statePath value', statePath, s.val());
-      try{ if(unsub3) unsub3(); }catch(e){}
-    });
-  }catch(e){ console.warn('roomDiag err', e); }
-}
+// Room diagnostic helper removed (button removed from UI)
 
-modalRoomDiagBtn && modalRoomDiagBtn.addEventListener('click', ()=>{ roomDiagnostic(); });
-
-// Validate room state: fetch the /rooms/<id>/state once and run a validator
-const modalValidateStateBtn = document.getElementById('modalValidateStateBtn');
-const debugBypassUpdatedBy = document.getElementById('debugBypassUpdatedBy');
-
-if(debugBypassUpdatedBy){
-  // initialize global flag
-  window.__pe_bypassUpdatedBy = false;
-  debugBypassUpdatedBy.addEventListener('change', e=>{
-    window.__pe_bypassUpdatedBy = !!e.target.checked;
-    multiplayerStatus.textContent = window.__pe_bypassUpdatedBy ? 'Bypass enabled' : 'Bypass disabled';
-    setTimeout(()=> multiplayerStatus.textContent = '', 1400);
-    console.log('debug: __pe_bypassUpdatedBy =', window.__pe_bypassUpdatedBy);
-  });
-}
-
-function validateRoomState(){
-  try{
-    initFirebaseFromWindowConfig();
-    if(!firebaseDb){ multiplayerStatus.textContent = 'Firebase not configured'; console.warn('validateRoomState: firebase not initialized'); return; }
-    if(!multiplayerRoomId){ multiplayerStatus.textContent = 'No room joined'; console.warn('validateRoomState: multiplayerRoomId not set'); return; }
-    const path = 'rooms/' + multiplayerRoomId + '/state';
-    multiplayerStatus.textContent = 'Validating...';
-    const unsub = window.__pe_firebase_mod.onValue(path, snap=>{
-      try{
-        const v = snap.val();
-        console.log('validateRoomState: fetched', path, v);
-        if(!v){ console.warn('validateRoomState: no state found at', path); multiplayerStatus.textContent = 'No state found'; return; }
-        const info = {
-          typeOfBoard: Array.isArray(v.board) ? 'array' : (v.board && typeof v.board === 'object' ? 'object' : typeof v.board),
-          boardLength: Array.isArray(v.board) ? v.board.length : Object.keys(v.board || {}).length,
-          has_meta: !!v._meta,
-          meta_updatedBy: v._meta && v._meta.updatedBy,
-          meta_ts: v._meta && v._meta.ts
-        };
-        console.log('validateRoomState: summary', info);
-        // Run the same validator used by applySnapshot
-        if(!v || !v.board){ console.warn('validateRoomState: invalid - missing board', v); multiplayerStatus.textContent = 'Invalid: missing board'; }
-        else if(!Array.isArray(v.board) && typeof v.board === 'object'){
-          console.log('validateRoomState: board is object (RTDB array shape). Will normalize and validate array length.');
-          const keys = Object.keys(v.board || {}).filter(k=>!Number.isNaN(Number(k)));
-          console.log('validateRoomState: numeric keys count', keys.length, 'sampleKeys', keys.slice(0,8));
-          multiplayerStatus.textContent = 'Board looks like object — see console';
-        } else if(Array.isArray(v.board) && v.board.length === 25){
-          multiplayerStatus.textContent = 'Valid room state';
-        } else {
-          multiplayerStatus.textContent = 'Invalid board shape — see console';
-        }
-      }catch(e){ console.warn('validateRoomState onValue err', e); multiplayerStatus.textContent = 'Error'; }
-      try{ if(unsub) unsub(); }catch(e){}
-    });
-  }catch(e){ console.warn('validateRoomState err', e); multiplayerStatus.textContent = 'Error'; }
-}
-
-modalValidateStateBtn && modalValidateStateBtn.addEventListener('click', ()=>{ validateRoomState(); });
+// Debug checkbox removed from the UI. Developers can still toggle the
+// bypass at runtime via the console when needed:
+//   window.__pe_bypassUpdatedBy = true
+// The listener wiring and DOM checkbox were removed to keep the UI clean.
 
 function fetchAndShowRoomState(){
   try{
@@ -781,7 +685,7 @@ function fetchAndShowRoomState(){
   }catch(e){ console.warn('fetchAndShowRoomState err', e); multiplayerStatus.textContent = 'Error'; }
 }
 
-modalRefreshStateBtn && modalRefreshStateBtn.addEventListener('click', ()=>{ fetchAndShowRoomState(); });
+// Refresh Room State button removed from UI; fetchAndShowRoomState remains available via console if needed.
 
 // Lobby listener unsubscribe
 let _lobbiesListenerUnsub = null;
@@ -908,6 +812,7 @@ function createRoom(initialSnapshot, hostColor = 'red'){
     return window.__pe_firebase_mod.set(newRoomRef, payload).then(()=>{
       multiplayerRoomId = roomId;
       listenRoom(roomId);
+      try{ updateUndoRedoButtons(); }catch(e){}
       console.log('createRoom: created', roomId);
       return roomId;
     }).catch(e=>{ console.warn('createRoom error', e); throw e; });
@@ -932,6 +837,7 @@ function joinRoom(roomId){
       }
       multiplayerRoomId = roomId;
       listenRoom(roomId);
+  try{ updateUndoRedoButtons(); }catch(e){}
       console.log('joinRoom: joined', roomId);
       return roomId;
     }).catch(err=>{ console.warn('joinRoom txn err', err); throw err; });
@@ -1092,6 +998,7 @@ function leaveRoom(){
   if(!firebaseDb) return;
   try{ if(_roomListenerUnsubscribe){ _roomListenerUnsubscribe(); _roomListenerUnsubscribe = null; } }catch(e){}
   multiplayerRoomId = null;
+  try{ updateUndoRedoButtons(); }catch(e){}
 }
 
 let currentPlayer = 'red';
@@ -1796,10 +1703,33 @@ function recordSnapshot(opts = { countAsMove: true }){
 }
 function updateUndoRedoButtons(){
   // Disable undo when there's no earlier snapshot available
-  undoBtn.disabled = undoStack.length <= 1;
-  redoBtn.disabled = redoStack.length === 0;
+  // Also disable undo/redo during a multiplayer match to prevent local
+  // history manipulation while the authoritative state is synced.
+  const inMultiplayer = !!multiplayerRoomId;
+  // Prefer hiding the entire group container for a cleaner UI; if it's
+  // missing, fall back to toggling the individual buttons.
+  try{
+    if(secondaryActions){
+      if(inMultiplayer){
+        secondaryActions.style.display = 'none';
+        secondaryActions.setAttribute('aria-hidden','true');
+      } else {
+        secondaryActions.style.display = '';
+        secondaryActions.setAttribute('aria-hidden','false');
+      }
+    } else {
+      // fallback
+      if(inMultiplayer){ undoBtn.style.display = 'none'; redoBtn.style.display = 'none'; }
+      else { undoBtn.style.display = ''; redoBtn.style.display = ''; }
+    }
+  }catch(e){ /* ignore UI update errors */ }
+
+  // Keep disabled state consistent for accessibility even when hidden
+  try{ undoBtn.disabled = inMultiplayer || undoStack.length <= 1; }catch(e){}
+  try{ redoBtn.disabled = inMultiplayer || redoStack.length === 0; }catch(e){}
 }
 function undo(){
+  if(multiplayerRoomId){ console.log('undo: disabled during multiplayer match'); return; }
   // Undo a single logical move. Snapshots may be grouped into multiple
   // entries per move; we pop snapshots until we remove a snapshot that was
   // marked as __countAsMove (the marker is set on the snapshot that ends a move).
@@ -1835,6 +1765,7 @@ function undo(){
   updateStatus();
 }
 function redo(){
+  if(multiplayerRoomId){ console.log('redo: disabled during multiplayer match'); return; }
   // Redo a single logical move: pop snapshots from redoStack and push them
   // onto undoStack until we've pushed the snapshot that ends a move
   if(redoStack.length === 0) return;
@@ -2138,10 +2069,10 @@ emojiPickerStyle.textContent = `
     text-align: center;
   }
 
-  /* Startup mode chooser overlay */
-  #startModeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.45); z-index:10001; }
+  /* Startup mode chooser overlay: dark to match other overlays */
+  #startModeOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(6,6,6,0.72); z-index:10001; }
   #startModeOverlay.show{ display:flex; }
-  #startModeOverlay .modal-box{ width:360px; color:#111; padding:18px; }
+  #startModeOverlay .modal-box{ width:360px; color:#fff; background:#0b0b0b; padding: calc(14px * var(--scale)) calc(16px * var(--scale)); border-radius:14px; border: 1px solid rgba(255,255,255,0.92); box-shadow:0 18px 46px rgba(0,0,0,0.32); }
 `;
 document.head.appendChild(emojiPickerStyle);
 
