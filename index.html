@@ -403,6 +403,7 @@
       <span id="victoryEmoji" class="victory-emoji">🏆</span>
       <h2 id="victoryTitle">Victory!</h2>
       <p id="victoryText">Player wins the game.</p>
+        <div id="rematchStatus" class="small" style="margin-top:8px;min-height:18px"></div>
       <div class="victory-actions">
         <button id="victoryRestart">Play Again</button>
         <button id="victoryClose">Close</button>
@@ -750,6 +751,13 @@ let firebaseApp = null;
 let firebaseDb = null;
 let multiplayerRoomId = null;
 let _roomListenerUnsubscribe = null;
+// persistent meta/rematch listeners for the current room
+let _roomMetaUnsub = null;
+let _roomRematchUnsub = null;
+let lastRoomMeta = null; // holds last seen room object (players, hostColor, etc.)
+// rematch state tracking
+let _myRematchRequested = false;
+let _lastRematchObj = null;
 // persistent client id base (shared across tabs) and a per-tab session id so
 // different browser tabs/windows still produce different client identifiers.
 const __pe_base_client_id = localStorage.getItem('__pe_client_id') || ('pe_' + Math.random().toString(36).slice(2,9));
@@ -898,9 +906,12 @@ function listenRoom(roomId){
   // also fetch room metadata (players/hostColor) so we know which color this client controls
   try{
     const roomPath = 'rooms/' + roomId;
-    const unsubRoom = window.__pe_firebase_mod.onValue(roomPath, snap=>{
+    // keep a persistent metadata listener so we always know the players and hostColor
+    try{ if(_roomMetaUnsub){ _roomMetaUnsub(); _roomMetaUnsub = null; } }catch(e){}
+    _roomMetaUnsub = window.__pe_firebase_mod.onValue(roomPath, snap=>{
       try{
         const v = snap.val();
+        lastRoomMeta = v || null;
         if(v){
           const players = v.players || {};
           const hostId = players.host;
@@ -913,7 +924,12 @@ function listenRoom(roomId){
           try{ updateUndoRedoButtons(); }catch(e){}
         }
       }catch(e){ console.warn('room metadata onValue err', e); }
-      try{ if(unsubRoom) unsubRoom(); }catch(e){}
+    });
+    // Also listen for rematch requests under rooms/<id>/rematch
+    try{ if(_roomRematchUnsub){ _roomRematchUnsub(); _roomRematchUnsub = null; } }catch(e){}
+    const rematchPath = 'rooms/' + roomId + '/rematch';
+    _roomRematchUnsub = window.__pe_firebase_mod.onValue(rematchPath, snap=>{
+      try{ handleRematchUpdate(snap.val()); }catch(e){ console.warn('rematch onValue handler failed', e); }
     });
   }catch(e){ console.warn('listenRoom: failed to read room metadata', e); }
 }
@@ -928,6 +944,87 @@ function sendSnapshotToRoom(snapshot){
       console.log('multiplayer: sent snapshot to room', multiplayerRoomId, payload._meta && payload._meta.ts);
     }).catch(e=>{ console.warn('sendSnapshot error', e); throw e; });
   }catch(e){ console.warn('sendSnapshot error', e); return Promise.reject(e); }
+}
+
+// Rematch helpers: send a rematch request and clear rematch state
+function sendRematchRequest(){
+  if(!firebaseDb || !multiplayerRoomId) return;
+  try{
+    const rematchPath = 'rooms/' + multiplayerRoomId + '/rematch';
+    const payload = {};
+    payload[myClientId] = { ts: Date.now() };
+    _myRematchRequested = true;
+    console.log('rematch: sending request for', myClientId);
+    return window.__pe_firebase_mod.update(rematchPath, payload).catch(e=>{ console.warn('sendRematchRequest failed', e); });
+  }catch(e){ console.warn('sendRematchRequest err', e); }
+}
+
+function clearRematchRequests(){
+  if(!firebaseDb || !multiplayerRoomId) return;
+  try{
+    const rematchPath = 'rooms/' + multiplayerRoomId + '/rematch';
+    return window.__pe_firebase_mod.set(rematchPath, null).catch(e=>{ console.warn('clearRematchRequests failed', e); });
+  }catch(e){ console.warn('clearRematchRequests err', e); }
+}
+
+function withdrawMyRematchRequest(){
+  if(!firebaseDb || !multiplayerRoomId) return;
+  try{
+    const rematchPath = 'rooms/' + multiplayerRoomId + '/rematch';
+    const payload = {}; payload[myClientId] = null;
+    return window.__pe_firebase_mod.update(rematchPath, payload).catch(e=>{ console.warn('withdrawMyRematchRequest failed', e); });
+  }catch(e){ console.warn('withdrawMyRematchRequest err', e); }
+}
+
+// Called whenever the rematch node under the room changes
+function handleRematchUpdate(rematchObj){
+  _lastRematchObj = rematchObj || {};
+  // If overlay is open, update its rematch status UI
+  try{
+    const remEl = document.getElementById('rematchStatus');
+    const restart = document.getElementById('victoryRestart');
+    if(!remEl) return;
+    // Determine players
+    const players = (lastRoomMeta && lastRoomMeta.players) ? lastRoomMeta.players : {};
+    const hostId = players.host || null;
+    const guestId = players.guest || null;
+    const hostAgreed = !!(rematchObj && hostId && rematchObj[hostId]);
+    const guestAgreed = !!(rematchObj && guestId && rematchObj[guestId]);
+    // update rematch status copy
+    if(_myRematchRequested){
+      remEl.textContent = 'You requested a rematch. ' + ((hostAgreed && guestAgreed) ? 'Both players agreed.' : 'Waiting for opponent...');
+      if(restart){ restart.disabled = true; restart.textContent = (hostAgreed && guestAgreed) ? 'Starting...' : 'Waiting...'; }
+    } else if(hostAgreed || guestAgreed){
+      // opponent requested (or host) but we haven't clicked yet
+      remEl.textContent = 'Opponent requested a rematch. Click Rematch to agree.';
+      if(restart){ restart.disabled = false; restart.textContent = 'Rematch'; }
+    } else {
+      remEl.textContent = '';
+      if(restart){ restart.disabled = false; restart.textContent = 'Rematch'; }
+    }
+
+    // If both players agreed, perform authoritative reset (one client will write)
+    if(hostAgreed && guestAgreed){
+      // reset local flag
+      _myRematchRequested = false;
+      // close the overlay immediately so both players return to the board
+      try{
+        const overlay = document.getElementById('victoryOverlay');
+        if(overlay){ stopVictoryTune(); overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); }
+      }catch(e){ /* ignore */ }
+      try{ board.style.pointerEvents = ''; }catch(e){}
+      // perform reset by sending cleared snapshot to room and clearing rematch node
+      try{
+        console.log('rematch: both players agreed; sending reset snapshot');
+        resetBoard();
+        const snap = takeSnapshot(); snap.gameOver = false; snap.winner = null;
+        sendSnapshotToRoom(snap).then(()=>{
+          // clear rematch requests after successful reset
+          clearRematchRequests().catch(e=>{});
+        }).catch(e=>{ console.warn('rematch: failed to send reset snapshot', e); });
+      }catch(e){ console.warn('rematch handling reset err', e); }
+    }
+  }catch(e){ console.warn('handleRematchUpdate err', e); }
 }
 
 // ------------------
@@ -1040,6 +1137,10 @@ function leaveRoom(){
   multiplayerRoomId = null;
   // clear assigned player color when leaving
   myPlayerColor = null;
+  // cleanup meta and rematch listeners
+  try{ if(_roomMetaUnsub){ _roomMetaUnsub(); _roomMetaUnsub = null; } }catch(e){}
+  try{ if(_roomRematchUnsub){ _roomRematchUnsub(); _roomRematchUnsub = null; } }catch(e){}
+  lastRoomMeta = null; _myRematchRequested = false; _lastRematchObj = null;
   try{ updateUndoRedoButtons(); }catch(e){}
 }
 
@@ -2650,13 +2751,22 @@ function showEndOverlay(winnerColor){
   const close = document.getElementById('victoryClose');
   if(restart) restart.onclick = ()=>{
     try{ stopVictoryTune(); }catch(e){}
-    overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = '';
-    if(multiplayerRoomId){
-      try{ resetBoard(); const snap = takeSnapshot(); snap.gameOver = false; snap.winner = null; sendSnapshotToRoom(snap).catch(e=>{ console.warn('rematch send failed', e); }); return; }catch(e){ console.warn('rematch failed', e); }
+    // Single-player: immediate reset as before
+    if(!multiplayerRoomId){
+      overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = '';
+      resetBoard();
+      return;
     }
-    resetBoard();
+    // Multiplayer: request a rematch and wait for opponent to agree
+    try{
+      _myRematchRequested = true;
+      const remEl = document.getElementById('rematchStatus');
+      if(remEl) remEl.textContent = 'You requested a rematch. Waiting for opponent...';
+      if(restart){ restart.disabled = true; restart.textContent = 'Waiting...'; }
+      sendRematchRequest().catch(e=>{ console.warn('rematch request failed', e); });
+    }catch(e){ console.warn('rematch request err', e); }
   };
-  if(close) close.onclick = ()=>{ try{ stopVictoryTune(); }catch(e){} overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; };
+  if(close) close.onclick = ()=>{ try{ stopVictoryTune(); }catch(e){} overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; try{ if(_myRematchRequested){ withdrawMyRematchRequest(); _myRematchRequested = false; } }catch(e){} };
 }
 
 function hideVictory(){ const overlay = document.getElementById('victoryOverlay'); if(!overlay) return; overlay.classList.remove('show'); overlay.setAttribute('aria-hidden','true'); board.style.pointerEvents = ''; stopVictoryTune(); }
