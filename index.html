@@ -761,6 +761,9 @@ sessionStorage.setItem('__pe_session_id', __pe_session_id);
 let myClientId = __pe_base_client_id + '|' + __pe_session_id;
 console.log('multiplayer: myClientId=', myClientId);
 
+// Which color this client controls when in a multiplayer room (null for spectator)
+let myPlayerColor = null;
+
 function initFirebaseFromWindowConfig(){
   try{
     if(window.__FIREBASE_CONFIG && window.__pe_firebase_mod && !firebaseApp){
@@ -771,6 +774,32 @@ function initFirebaseFromWindowConfig(){
       console.log('Firebase initialized (modular Realtime DB)');
     }
   }catch(e){ console.warn('Firebase init error', e); }
+}
+
+// Read room metadata once and set myPlayerColor for this client (host/guest mapping)
+function fetchAndSetPlayerColor(roomId){
+  try{
+    if(!firebaseDb) initFirebaseFromWindowConfig();
+    if(!firebaseDb) return;
+    const roomPath = 'rooms/' + roomId;
+    const unsub = window.__pe_firebase_mod.onValue(roomPath, snap=>{
+      try{
+        const v = snap.val();
+        if(v){
+          const players = v.players || {};
+          const hostId = players.host;
+          const guestId = players.guest;
+          const hostColor = v.hostColor || (v.state && v.state.currentPlayer) || 'red';
+          if(hostId === myClientId) myPlayerColor = hostColor;
+          else if(guestId === myClientId) myPlayerColor = (hostColor === 'red' ? 'blue' : 'red');
+          else myPlayerColor = null;
+          console.log('fetchAndSetPlayerColor: myPlayerColor=', myPlayerColor);
+          try{ updateUndoRedoButtons(); }catch(e){}
+        }
+      }catch(e){ console.warn('fetchAndSetPlayerColor err', e); }
+      try{ if(unsub) unsub(); }catch(e){}
+    });
+  }catch(e){ console.warn('fetchAndSetPlayerColor top err', e); }
 }
 
 function createRoom(initialSnapshot, hostColor = 'red'){
@@ -791,9 +820,11 @@ function createRoom(initialSnapshot, hostColor = 'red'){
     };
     return window.__pe_firebase_mod.set(newRoomRef, payload).then(()=>{
       multiplayerRoomId = roomId;
+      // host controls the chosen hostColor
+      myPlayerColor = hostColor;
       listenRoom(roomId);
       try{ updateUndoRedoButtons(); }catch(e){}
-      console.log('createRoom: created', roomId);
+      console.log('createRoom: created', roomId, 'myPlayerColor=', myPlayerColor);
       return roomId;
     }).catch(e=>{ console.warn('createRoom error', e); throw e; });
   }catch(e){ console.warn('createRoom error', e); return Promise.reject(e); }
@@ -816,7 +847,9 @@ function joinRoom(roomId){
         throw new Error('Failed to join room (maybe full)');
       }
       multiplayerRoomId = roomId;
-      listenRoom(roomId);
+        listenRoom(roomId);
+        // Fetch room info to determine which color this client controls
+        try{ fetchAndSetPlayerColor(roomId); }catch(e){ console.warn('fetchAndSetPlayerColor err', e); }
   try{ updateUndoRedoButtons(); }catch(e){}
       console.log('joinRoom: joined', roomId);
       return roomId;
@@ -856,6 +889,27 @@ function listenRoom(roomId){
       }
     }catch(e){ console.warn('failed apply remote snapshot', e); }
   });
+  // also fetch room metadata (players/hostColor) so we know which color this client controls
+  try{
+    const roomPath = 'rooms/' + roomId;
+    const unsubRoom = window.__pe_firebase_mod.onValue(roomPath, snap=>{
+      try{
+        const v = snap.val();
+        if(v){
+          const players = v.players || {};
+          const hostId = players.host;
+          const guestId = players.guest;
+          const hostColor = v.hostColor || (v.state && v.state.currentPlayer) || 'red';
+          if(hostId === myClientId) myPlayerColor = hostColor;
+          else if(guestId === myClientId) myPlayerColor = (hostColor === 'red' ? 'blue' : 'red');
+          else myPlayerColor = null;
+          console.log('multiplayer: set myPlayerColor=', myPlayerColor);
+          try{ updateUndoRedoButtons(); }catch(e){}
+        }
+      }catch(e){ console.warn('room metadata onValue err', e); }
+      try{ if(unsubRoom) unsubRoom(); }catch(e){}
+    });
+  }catch(e){ console.warn('listenRoom: failed to read room metadata', e); }
 }
 
 function sendSnapshotToRoom(snapshot){
@@ -978,6 +1032,8 @@ function leaveRoom(){
   if(!firebaseDb) return;
   try{ if(_roomListenerUnsubscribe){ _roomListenerUnsubscribe(); _roomListenerUnsubscribe = null; } }catch(e){}
   multiplayerRoomId = null;
+  // clear assigned player color when leaving
+  myPlayerColor = null;
   try{ updateUndoRedoButtons(); }catch(e){}
 }
 
@@ -2648,6 +2704,11 @@ function makePawn(color){
       }
       if (pawn !== chainPawn) { ev.preventDefault(); resumeIdle(); return; }
     }
+    // In multiplayer, prevent dragging pawns that aren't owned by this client
+    if(multiplayerRoomId){
+      if(!myPlayerColor){ ev.preventDefault(); resumeIdle(); multiplayerStatus.textContent = 'Not assigned a player color'; setTimeout(()=> multiplayerStatus.textContent = '', 1500); return; }
+      if(pawn.dataset.color !== myPlayerColor){ ev.preventDefault(); resumeIdle(); multiplayerStatus.textContent = "Cannot move opponent's pawns in multiplayer"; setTimeout(()=> multiplayerStatus.textContent = '', 1500); return; }
+    }
     if (pawn.dataset.color !== currentPlayer) { ev.preventDefault(); resumeIdle(); return; }
     dragged = pawn; pawn.classList.add('dragging');
     try { ev.dataTransfer.setData('text/plain','drag'); } catch(e){}
@@ -2668,6 +2729,11 @@ function makePawn(color){
         }
       }
       if (pawn !== chainPawn) { resumeIdle(); return; }
+    }
+    // In multiplayer, prevent interacting with pawns that aren't owned by this client
+    if(multiplayerRoomId){
+      if(!myPlayerColor){ resumeIdle(); multiplayerStatus.textContent = 'Not assigned a player color'; setTimeout(()=> multiplayerStatus.textContent = '', 1500); return; }
+      if(pawn.dataset.color !== myPlayerColor){ resumeIdle(); multiplayerStatus.textContent = "Cannot move opponent's pawns in multiplayer"; setTimeout(()=> multiplayerStatus.textContent = '', 1500); return; }
     }
     if (pawn.dataset.color !== currentPlayer) { resumeIdle(); return; }
 
