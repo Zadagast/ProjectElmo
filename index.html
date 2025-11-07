@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Attack-Tac-Toe v005.1 — Attack-Tac-</title>
+<title>Kings Plane v005.1 — Attack-Tac-</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   :root{
@@ -411,6 +411,9 @@
     .pawn::before, .pawn::after, .pawn:hover::before, .pawn:hover::after { animation: none; transition: none; filter: none; mix-blend-mode: normal; }
   }
 
+  /* When in single-player mode hide the Host/Join group (they're multiplayer-only) */
+  body.single-player .multiplayer-actions { display: none !important; }
+
   /* Victory overlay */
   .victory-overlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,6,6,0.6); z-index:9999; opacity:0; pointer-events:none; transition:opacity 220ms ease; }
   .victory-overlay.show{ opacity:1; pointer-events:auto; }
@@ -419,6 +422,40 @@
   .victory-card p{ margin:0 0 calc(14px * var(--scale)) 0; font-size:calc(16px * var(--scale)); opacity:0.95 }
   .victory-actions{ display:flex; gap:calc(10px * var(--scale)); justify-content:center; margin-top:calc(12px * var(--scale)); }
   .victory-emoji{ font-size:calc(54px * var(--scale)); margin-bottom:calc(6px * var(--scale)); display:block }
+  /* Splash screen overlay (uses local splash.png by default or window.SPLASH_IMAGE_URL)
+     Place the provided image next to this HTML as `splash.png` or set
+     `window.SPLASH_IMAGE_URL` before this script to override. */
+  /* splash overlay: fade to black over 900ms; initial background is white and will transition to black when hiding */
+  #splashOverlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:10002; background:#fff; transition: opacity 1400ms ease, background-color 1400ms ease, visibility 1400ms; opacity:1; pointer-events:auto; }
+  #splashOverlay.hide{ opacity:0; background-color:#000; pointer-events:none; visibility:hidden; }
+  /* remove drop shadow per request; keep mild rounding for the image */
+  #splashOverlay img{ max-width:78vw; max-height:78vh; width:auto; height:auto; object-fit:contain; border-radius:6px; }
+  /* Ensure image and button can fade independently of the overlay so we
+    can keep a solid black overlay while the contents fade (prevents
+    underlying UI from showing through during the transition). */
+  #splashOverlay img, #splashOverlay .start-btn { transition: opacity 1400ms ease, transform 300ms ease; }
+  /* fade state applied to the wrapper when hiding: only the contents fade
+    while the overlay background becomes black instantly. */
+  #splashOverlay .start-wrap.fade-out img,
+  #splashOverlay .start-wrap.fade-out .start-btn {
+   opacity: 0;
+   transform: translateY(6px) scale(0.995);
+  }
+  /* Start button inside splash overlay */
+  #splashOverlay .start-btn{
+    margin-top:0; display:inline-flex; align-items:center; justify-content:center; gap:10px;
+    padding:14px 120px; font-weight:900; font-size:40px; border-radius:18px; cursor:pointer; letter-spacing:0.6px;
+    background:#000000; color:#ffffff; border:4px solid #000000; box-shadow: none; transition: transform 140ms ease, opacity 140ms ease, background-color 140ms ease, color 140ms ease;
+  }
+  /* hover: slightly lighter black to indicate interactivity */
+  #splashOverlay .start-btn:hover{ background:#111111; color:#ffffff; }
+  #splashOverlay .start-btn:active{ transform: translateY(1px) scale(0.995); }
+  /* position the start button below the image while keeping overlay centered */
+  #splashOverlay .start-wrap{ display:flex; flex-direction:column; align-items:center; gap:0; }
+  /* Responsive: scale the Play button down on small viewports so it doesn't crowd the image */
+  @media (max-width:520px){
+    #splashOverlay .start-btn{ padding:18px 28px; font-size:20px; border-radius:12px; }
+  }
 </style>
 </head>
 <body>
@@ -428,7 +465,7 @@
     <div class="panel-backdrop">
       <header>
         <div class="titleRow">
-          <h1>Attack-Tac-Toe</h1>
+          <h1>Kings Plane</h1>
           <div class="vbadge">v006.9</div>
         </div>
         <div id="status" class="small" aria-live="polite"></div>
@@ -711,6 +748,135 @@ startModeOverlay.innerHTML = `
 `;
 document.body.appendChild(startModeOverlay);
 
+// Splash overlay: show the provided branding image at startup.
+(function(){
+  try{
+    if(document.getElementById('splashOverlay')) return;
+    const splash = document.createElement('div');
+    splash.id = 'splashOverlay';
+    splash.setAttribute('aria-hidden','false');
+    const img = document.createElement('img');
+    img.alt = 'Kings Plane';
+    // allow a page script to override the image URL by setting window.SPLASH_IMAGE_URL
+    img.src = (typeof window.SPLASH_IMAGE_URL === 'string' && window.SPLASH_IMAGE_URL) ? window.SPLASH_IMAGE_URL : 'splash.png';
+  // wrap image and start button so they layout vertically
+  const startWrap = document.createElement('div'); startWrap.className = 'start-wrap';
+  startWrap.appendChild(img);
+  const startBtn = document.createElement('button');
+  startBtn.className = 'start-btn'; startBtn.type = 'button'; startBtn.textContent = 'Play'; startBtn.setAttribute('aria-label','Play game');
+  // Match splash logo font if provided, otherwise use a serif stack similar to the logo
+  try{ startBtn.style.fontFamily = (typeof window.SPLASH_FONT_FAMILY === 'string' && window.SPLASH_FONT_FAMILY) ? window.SPLASH_FONT_FAMILY : "'Playfair Display', Georgia, 'Times New Roman', serif"; }catch(e){}
+  // clicking the Start button should hide the splash and open the Start Mode overlay
+  startBtn.addEventListener('click', (ev)=>{ try{ ev.stopPropagation();
+      // Start intro music (if any) — this is a user gesture so audio autoplay is allowed
+      try{ playIntroIfAvailable(); }catch(e){ console.warn('playIntro err', e); }
+      hide(); try{ showStartModeOverlay(); }catch(e){} }catch(e){} });
+  startWrap.appendChild(startBtn);
+    splash.appendChild(startWrap);
+    document.body.appendChild(splash);
+  const hide = ()=>{ try{
+      // Fade out image and button only while keeping the overlay opaque.
+      // This prevents the image's white background from appearing against
+      // a black overlay during the transition.
+      try{ startWrap.classList.add('fade-out'); }catch(e){}
+      splash.setAttribute('aria-hidden','true');
+      // After the content fade completes (900ms), switch the overlay to
+      // black quickly and then remove the element after a small buffer.
+      setTimeout(()=>{
+        try{
+          // Make backgroundColor change immediate to avoid a visible cross-fade
+          const prev = splash.style.transition;
+          try{ splash.style.transition = 'background-color 0ms ease, visibility 0ms'; }catch(e){}
+          splash.style.backgroundColor = '#000';
+          // restore previous transition so remaining splash rules behave normally
+          try{ splash.style.transition = prev || ''; }catch(e){}
+        }catch(e){}
+        setTimeout(()=>{ try{ if(splash && splash.parentElement) splash.parentElement.removeChild(splash); }catch(e){} }, 120);
+      }, 1420);
+    }catch(e){} };
+    // Only close the splash when the Start button is pressed. Disabled auto-hide and background click-to-dismiss.
+  }catch(e){ console.warn('splash init err', e); }
+})();
+
+  // --- Intro music player --------------------------------------------------
+  // Plays a MIDI/audio URL if window.START_MIDI_URL is set; otherwise uses a
+  // simple WebAudio synth fallback to play a short intro melody. The Play
+  // button click is used to trigger playback so it meets browser gesture
+  // requirements.
+  let _introAudioEl = null;
+  let _introSynthNodes = [];
+  let _introPlaying = false;
+  function stopIntro(){
+    try{
+      if(_introAudioEl){ try{ _introAudioEl.pause(); _introAudioEl.src = ''; _introAudioEl.remove(); }catch(e){} _introAudioEl = null; }
+      if(_introSynthNodes && _introSynthNodes.length){ _introSynthNodes.forEach(n=>{ try{ n.osc.stop(0); n.gain.disconnect(); }catch(e){} }); _introSynthNodes = []; }
+    }catch(e){ console.warn('stopIntro err', e); }
+    _introPlaying = false;
+  }
+
+  function playAudioUrl(url){
+    return new Promise((resolve,reject)=>{
+      try{
+        stopIntro();
+        const a = document.createElement('audio');
+        a.src = url;
+        a.preload = 'auto';
+        a.autoplay = true;
+        a.volume = (typeof window.START_MUSIC_VOLUME === 'number') ? clamp(window.START_MUSIC_VOLUME, 0, 1) : 0.7;
+        a.addEventListener('ended', ()=>{ _introPlaying = false; resolve(); });
+        a.addEventListener('canplay', ()=>{ try{ a.play().catch(()=>{}); }catch(e){} });
+        a.addEventListener('error', (e)=>{ reject(new Error('audio failed')); });
+        document.body.appendChild(a);
+        _introAudioEl = a;
+        _introPlaying = true;
+        // resolve once playback begins (best-effort)
+        resolve();
+      }catch(e){ reject(e); }
+    });
+  }
+
+  function freqFromMidi(m){ return 440 * Math.pow(2, (m - 69)/12); }
+
+  function playSynthIntro(){
+    try{
+      stopIntro();
+      ensureAudioContext();
+      if(!audioCtx) return;
+      _introPlaying = true;
+      const gainMaster = audioCtx.createGain(); gainMaster.gain.value = 0.14; gainMaster.connect(audioCtx.destination);
+      // Simple arpeggiated intro (MIDI note numbers) as fallback
+      const seq = [64,67,71,76,71,67,64,59, 64,67,71,76,79,76,71,67];
+      const durations = 200; // ms per note
+      let t0 = audioCtx.currentTime + 0.02;
+      seq.forEach((midi,i)=>{
+        const osc = audioCtx.createOscillator(); const g = audioCtx.createGain();
+        osc.type = 'sawtooth'; osc.frequency.setValueAtTime(freqFromMidi(midi), t0 + (i * durations)/1000);
+        g.gain.setValueAtTime(0.0001, t0 + (i * durations)/1000);
+        g.gain.linearRampToValueAtTime(1.0 * 0.12, t0 + (i * durations)/1000 + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + ((i+1) * durations)/1000 - 0.02);
+        osc.connect(g); g.connect(gainMaster);
+        osc.start(t0 + (i * durations)/1000); osc.stop(t0 + ((i+1) * durations)/1000);
+        _introSynthNodes.push({ osc, gain: g });
+      });
+      // auto-clear after sequence
+      setTimeout(()=>{ stopIntro(); }, seq.length * durations + 160);
+    }catch(e){ console.warn('playSynthIntro err', e); }
+  }
+
+  function playIntroIfAvailable(){
+    try{
+      if(_introPlaying) return; // already playing
+      // If a URL is provided, attempt to play it via audio element first
+      if(typeof window.START_MIDI_URL === 'string' && window.START_MIDI_URL.trim()){
+        playAudioUrl(window.START_MIDI_URL).catch(err=>{ console.warn('failed to play START_MIDI_URL, falling back to synth', err); playSynthIntro(); });
+        return;
+      }
+      // No URL: play fallback synth intro
+      playSynthIntro();
+    }catch(e){ console.warn('playIntroIfAvailable err', e); }
+  }
+
+
 const startSingleBtn = document.getElementById('startSingleBtn');
 const startMultiBtn = document.getElementById('startMultiBtn');
 function showStartModeOverlay(){
@@ -722,6 +888,15 @@ function hideStartModeOverlay(){ startModeOverlay.classList.remove('show'); star
 
 startSingleBtn && startSingleBtn.addEventListener('click', ()=>{
   try{ hideStartModeOverlay();
+    // mark page as single-player so multiplayer UI (host/join) hides
+    try{ document.body.classList.add('single-player'); }catch(e){}
+    // enable AI by default in single-player and update toggle UI
+    try{
+      aiEnabled = true;
+      const btn = document.getElementById('aiToggleBtn');
+      if(btn){ btn.setAttribute('aria-pressed','true'); btn.textContent = 'AI: On'; btn.classList.add('toggle-on'); btn.classList.remove('toggle-off'); }
+      try{ scheduleAiIfNeeded(320); }catch(e){}
+    }catch(e){}
     // Open emoji picker for single player setup
     if(emojiPickerOverlay){
       // Ensure the picker reflects multiplayer state (if any) before showing
@@ -754,7 +929,17 @@ const startMatchBtn = document.getElementById('startMatchBtn');
 try{ if(modalCreateRoomBtn) modalCreateRoomBtn.textContent = 'Click here to Host a match.'; }catch(e){}
 try{ if(copyLobbyBtn) copyLobbyBtn.textContent = 'Click here to Host a match.'; }catch(e){}
 
-function showMultiplayerModal(){ multiplayerModal.classList.add('show'); multiplayerModal.setAttribute('aria-hidden','false'); }
+function showMultiplayerModal(){
+  multiplayerModal.classList.add('show'); multiplayerModal.setAttribute('aria-hidden','false');
+  try{ document.body.classList.remove('single-player'); }catch(e){}
+  // disable AI when entering multiplayer and update toggle UI
+  try{
+    aiEnabled = false;
+    if(_aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
+    const btn = document.getElementById('aiToggleBtn');
+    if(btn){ btn.setAttribute('aria-pressed','false'); btn.textContent = 'AI: Off'; btn.classList.remove('toggle-on'); btn.classList.add('toggle-off'); }
+  }catch(e){}
+}
 function hideMultiplayerModal(){ multiplayerModal.classList.remove('show'); multiplayerModal.setAttribute('aria-hidden','true'); try{ if(createdLobbyContainer) createdLobbyContainer.style.display='none'; }catch(e){} multiplayerStatus.textContent=''; }
 
 // wire top-level Host/Join buttons to open modal
@@ -2718,16 +2903,21 @@ document.getElementById('emojiConfirmBtn').addEventListener('click', ()=>{
     });
     // update victory and status UI by forcing refresh
     updateStatus();
-    // present coin flip so the player can determine who starts
+    // Skip coin flip in single-player: assign starting player deterministically
     try{
-      showCoinFlip();
-    }catch(e){
-      // fallback: set AI color and hide overlay immediately
+      // AI plays the opposite color of the human
       aiColor = (window.humanColor === 'red') ? 'blue' : 'red';
+      // Let the human start by default
+      currentPlayer = window.humanColor;
+      // refresh UI and status
+      updateStatus();
+      // ensure coin flip modal flag is not active
+      window.coinFlipActive = false;
+      // hide the emoji picker overlay
+      try{ emojiPickerOverlay.setAttribute('aria-hidden','true'); emojiPickerOverlay.style.display = 'none'; }catch(e){}
+      // If AI is enabled and it's AI's turn (shouldn't be by default), schedule it
       if(aiEnabled && currentPlayer === aiColor) scheduleAiIfNeeded(320);
-      emojiPickerOverlay.setAttribute('aria-hidden','true');
-      emojiPickerOverlay.style.display = 'none';
-    }
+    }catch(e){ console.warn('skip coin flip fallback err', e); }
   }catch(e){ console.warn('emojiConfirm err', e); }
 });
 
