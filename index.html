@@ -218,6 +218,13 @@
   #multiplayerModal.show{ display:flex; }
   /* Dark backdrop to match other overlays like the start/emoji pickers */
   #multiplayerModal .modal-backdrop{ position:absolute; inset:0; background:rgba(6,6,6,0.72); }
+  /* Promotion overlay (matches other modal styles) */
+  #promotionOverlay{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:10003; }
+  #promotionOverlay.show{ display:flex; }
+  #promotionOverlay .modal-backdrop{ position:absolute; inset:0; background:rgba(6,6,6,0.72); }
+  #promotionOverlay .modal-box{ position:relative; z-index:2; width:min(420px, calc(92%)); background:#0b0b0b; color:#fff; border-radius:12px; border: 1px solid rgba(255,255,255,0.92); padding: 12px 16px; box-shadow:0 18px 46px rgba(0,0,0,0.32); text-align:center; }
+  #promotionOverlay .modal-box h3{ margin:0 0 8px 0; font-size:16px; color:#fff; }
+  #promotionOverlay .modal-box button{ background:#000; color:#fff; border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:10px 14px; border-radius:8px; font-weight:700; }
   /* Dark modal box styling to match other overlays (curved white border) */
   #multiplayerModal .modal-box{ position:relative; z-index:2; width:min(520px, calc(92%)); background:#0b0b0b; color:#fff; border-radius:14px; border: 1px solid rgba(255,255,255,0.92); padding: calc(14px * var(--scale)) calc(16px * var(--scale)); box-shadow:0 18px 46px rgba(0,0,0,0.32); text-align:center; }
   #multiplayerModal .modal-box h3{ margin:0 0 8px 0; font-size:18px; color:#fff; }
@@ -294,6 +301,48 @@
   #startModeOverlay .modal-box button{ background:#000; color:#fff; border:1px solid rgba(255,255,255,0.08); box-shadow:none; padding:12px 18px; border-radius:8px; font-weight:700; }
   #startModeOverlay .modal-box button.alt{ background:#18a058; border:none; }
   .pawn .pface { position: relative; z-index: 31; pointer-events: none; display: inline-block; line-height:1; }
+  /* Pulsing neon ring shown for promoted pieces */
+  .pawn .promoRing {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(1);
+  /* even smaller so it sits inline with the small letter overlay */
+  width: calc(44px * var(--scale));
+  height: calc(44px * var(--scale));
+    border-radius: 50%;
+    z-index: 30; /* under promoGlyph (33) but above pface (31) */
+    pointer-events: none;
+  /* slight blur to smooth the glow while keeping it tight */
+  filter: blur(0.8px);
+    opacity: 0.0;
+    transition: opacity 160ms ease, transform 160ms ease;
+    box-shadow: 0 0 0 rgba(0,0,0,0);
+    background: transparent;
+    display: block;
+    will-change: transform, opacity;
+    animation: promoRingPulse 1200ms ease-in-out infinite;
+  }
+  .pawn .promoRing.red {
+    /* brighter red neon with a tighter halo */
+    background: radial-gradient(circle, rgba(255,120,120,0.20), rgba(255,80,80,0.08) 42%, transparent 58%);
+  box-shadow: 0 0 22px rgba(255,95,95,0.98), 0 0 44px rgba(255,70,70,0.28), inset 0 0 6px rgba(255,140,140,0.12);
+    opacity: 1.0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .pawn .promoRing.blue {
+    /* brighter blue neon with a tighter halo */
+    background: radial-gradient(circle, rgba(140,210,255,0.20), rgba(90,170,255,0.08) 42%, transparent 58%);
+  box-shadow: 0 0 22px rgba(80,160,255,0.98), 0 0 44px rgba(40,120,220,0.30), inset 0 0 6px rgba(160,210,255,0.12);
+    opacity: 1.0;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  @keyframes promoRingPulse {
+    0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+    50% { transform: translate(-50%, -50%) scale(1.06); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+  }
+  /* (promoGlyph rules consolidated at the end of the stylesheet) */
 
   @keyframes pawnIdleSquashWiggle {
     0%   { transform: translateZ(0) translateX(0) rotate(0deg) scaleX(1)   scaleY(1); }
@@ -455,6 +504,73 @@
   /* Responsive: scale the Play button down on small viewports so it doesn't crowd the image */
   @media (max-width:520px){
     #splashOverlay .start-btn{ padding:18px 28px; font-size:20px; border-radius:12px; }
+  }
+  /* Consolidated .promoGlyph rules: single authoritative placement + styling
+     Placed at the end of the stylesheet to override any earlier/accidental rules. */
+  body .app #board .cell .promoGlyph {
+    position: absolute !important;
+    /* moved closer to the tile corner */
+    top: calc(2px * var(--scale)) !important;
+    right: calc(2px * var(--scale)) !important;
+    left: auto !important;
+    transform: none !important;
+    z-index: 33 !important;
+    pointer-events: none !important;
+  /* widen the badge so a larger crown can sit to the left of the letter */
+  width: calc(36px * var(--scale)) !important;
+  height: calc(22px * var(--scale)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: calc(14px * var(--scale)) !important;
+    font-weight: 800 !important;
+    line-height: 1 !important;
+    border-radius: 50% !important;
+    background: transparent !important;
+    color: inherit !important;
+    text-shadow: -1px -1px 0 rgba(0,0,0,0.7), 1px -1px 0 rgba(0,0,0,0.7), -1px 1px 0 rgba(0,0,0,0.7), 1px 1px 0 rgba(0,0,0,0.7), 0 0 8px rgba(0,0,0,0.12) !important;
+    box-shadow: none !important;
+    transition: transform 160ms cubic-bezier(.2,.9,.2,1), background-color 160ms ease, box-shadow 160ms ease !important;
+  }
+  /* Ensure promoted state rules don't recenter the badge */
+  /* promoted-state (pawn is sibling of the badge) */
+  body .app #board .cell .pawn.promoted-knight ~ .promoGlyph,
+  body .app #board .cell .pawn.promoted-bishop ~ .promoGlyph {
+    transform: none !important;
+  }
+  /* Team color variants */
+  body .app #board .cell .pawn.promoted-bishop[data-color="red"] ~ .promoGlyph,
+  body .app #board .cell .pawn.promoted-knight[data-color="red"] ~ .promoGlyph {
+    background: transparent !important;
+    color: #ff6b6b !important;
+    box-shadow: none !important;
+    text-shadow: -1px -1px 0 rgba(0,0,0,0.7), 1px -1px 0 rgba(0,0,0,0.7), -1px 1px 0 rgba(0,0,0,0.7), 1px 1px 0 rgba(0,0,0,0.7), 0 0 10px rgba(255,90,90,0.85) !important;
+  }
+  body .app #board .cell .pawn.promoted-bishop[data-color="blue"] ~ .promoGlyph,
+  body .app #board .cell .pawn.promoted-knight[data-color="blue"] ~ .promoGlyph {
+    background: transparent !important;
+    color: #58b0ff !important;
+    box-shadow: none !important;
+    text-shadow: -1px -1px 0 rgba(0,0,0,0.7), 1px -1px 0 rgba(0,0,0,0.7), -1px 1px 0 rgba(0,0,0,0.7), 1px 1px 0 rgba(0,0,0,0.7), 0 0 10px rgba(80,160,255,0.85) !important;
+  }
+  /* small crown placed next to the B/K glyph; sized slightly smaller so it reads as a badge */
+  body .app #board .cell .promoGlyph .promoCrown {
+    /* place crown left of the letter, larger and slightly raised */
+    margin-right: calc(6px * var(--scale));
+    font-size: calc(18px * var(--scale));
+    line-height: 1;
+    display: inline-block;
+    transform: translateY(-2px);
+    pointer-events: none;
+  }
+  /* nudge the B/K left a bit so spacing looks tighter next to the crown */
+  body .app #board .cell .promoGlyph .promoLetter {
+    display: inline-block;
+    transform: translateX(calc(-3px * var(--scale))) translateY(0);
+    font-size: calc(14px * var(--scale));
+    line-height: 1;
+    font-weight: 800;
+    pointer-events: none;
   }
 </style>
 </head>
@@ -892,9 +1008,11 @@ startSingleBtn && startSingleBtn.addEventListener('click', ()=>{
     try{ document.body.classList.add('single-player'); }catch(e){}
     // enable AI by default in single-player and update toggle UI
     try{
-      aiEnabled = true;
-      const btn = document.getElementById('aiToggleBtn');
-      if(btn){ btn.setAttribute('aria-pressed','true'); btn.textContent = 'AI: On'; btn.classList.add('toggle-on'); btn.classList.remove('toggle-off'); }
+  aiEnabled = true;
+  // default to Hard difficulty for single-player
+  aiDifficulty = 'hard';
+  const btn = document.getElementById('aiToggleBtn');
+  if(btn){ btn.setAttribute('aria-pressed','true'); btn.textContent = 'AI: Hard'; btn.classList.add('toggle-on'); btn.classList.remove('toggle-off'); }
       try{ scheduleAiIfNeeded(320); }catch(e){}
     }catch(e){}
     // Open emoji picker for single player setup
@@ -1594,6 +1712,8 @@ let aiEnabled = false;            // toggle whether AI takes turns (OFF by defau
 let aiColor = 'blue';            // which color the AI will play
 let _aiTimer = null;             // scheduled timer id for AI thinking
 let _aiSession = 0;              // incrementing token to invalidate pending AI work during undos
+// AI difficulty mode. Default to 'Hard'.
+let aiDifficulty = 'hard';
 
 
 const undoStack = [];
@@ -1641,6 +1761,8 @@ function aiTakeTurn(session){
   // session token guards: if the global session has changed since this
   // aiTurn was scheduled, abort to avoid acting on stale state.
   if(typeof session !== 'number' || session !== _aiSession) return;
+  // delegate to harder AI when selected
+  if(aiDifficulty === 'hard') return aiTakeTurnHard(session);
   if(!aiEnabled) return;
   if(currentPlayer !== aiColor) return;
   // small randomized thinking delay to feel natural
@@ -1653,7 +1775,7 @@ function aiTakeTurn(session){
       try{
         // 1) If chain mode is active and chainPawn exists, continue capturing from it
         if(chainMode && chainPawn && chainPawn.dataset.color === aiColor){
-          const caps = availableDiagonalCapturesFromCell(chainPawn.parentElement);
+          const caps = availableCapturesFromCell(chainPawn.parentElement);
           if(caps && caps.length > 0){
             const target = caps[Math.floor(Math.random() * caps.length)];
             dragged = chainPawn;
@@ -1671,24 +1793,23 @@ function aiTakeTurn(session){
                 const fromIdx = Number(fromCell.dataset.index);
                 const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
                 const candidates = [];
-                for(let nx = fx-1; nx <= fx+1; nx++){
-                  for(let ny = fy-1; ny <= fy+1; ny++){
-                    if(nx < 0 || nx >= 5 || ny < 0 || ny >= 5) continue;
-                    const toIdx = ny * 5 + nx; if(toIdx === fromIdx) continue;
-                    const dest = board.children[toIdx]; if(!dest) continue;
-                    if(dest.querySelector('.pawn')) continue; // must be empty
-                    const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
-                    // apply same chain diagonal allowance used for player swipes
-                    if(isDiagonal(dx, dy)){
-                      const adj1 = board.children[fy * 5 + nx];
-                      const adj2 = board.children[ny * 5 + fx];
-                      const adj1Empty = adj1 && !adj1.querySelector('.pawn');
-                      const adj2Empty = adj2 && !adj2.querySelector('.pawn');
-                      if(toIdx !== chainPrevIdx && !(adj1Empty || adj2Empty)) continue;
-                    }
-                    if(isValidMove(dx, dy) || canDoubleStep(chainPawn, fromIdx, toIdx)){
-                      candidates.push(dest);
-                    }
+                // scan the whole board to allow knight/bishop moves and distant moves
+                for(let toIdx = 0; toIdx < 25; toIdx++){
+                  if(toIdx === fromIdx) continue;
+                  const dest = board.children[toIdx]; if(!dest) continue;
+                  if(dest.querySelector('.pawn')) continue; // must be empty
+                  const nx = toIdx % 5, ny = Math.floor(toIdx / 5);
+                  const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+                  // apply same chain diagonal allowance used for player swipes
+                  if(isDiagonal(dx, dy)){
+                    const adj1 = board.children[fy * 5 + nx];
+                    const adj2 = board.children[ny * 5 + fx];
+                    const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+                    const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+                    if(toIdx !== chainPrevIdx && !(adj1Empty || adj2Empty)) continue;
+                  }
+                  if(isValidMove(dx, dy, chainPawn, fromIdx, toIdx) || canDoubleStep(chainPawn, fromIdx, toIdx)){
+                    candidates.push(dest);
                   }
                 }
                 if(candidates.length > 0){
@@ -1708,7 +1829,7 @@ function aiTakeTurn(session){
         for(let i=0;i<25;i++){
           const cell = board.children[i]; if(!cell) continue;
           const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
-          const caps = availableDiagonalCapturesFromCell(cell);
+          const caps = availableCapturesFromCell(cell);
           if(caps && caps.length > 0){
             captureMoves.push({ pawn: p, from: cell, caps });
           }
@@ -1719,7 +1840,7 @@ function aiTakeTurn(session){
           for(const cand of captureMoves){
             for(const c of cand.caps){
               const tmpPawn = cand.pawn; const targetCell = c.cell;
-              const further = availableDiagonalCapturesFromCell(targetCell);
+              const further = availableCapturesFromCell(targetCell);
               if(further && further.length > 0){ chosen = { pawn: tmpPawn, target: targetCell }; break; }
             }
             if(chosen) break;
@@ -1754,7 +1875,7 @@ function aiTakeTurn(session){
               const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
               const dest = board.children[toIdx]; if(!dest) continue;
               if(dest.querySelector('.pawn')) continue;
-              if(isValidMove(dx,dy)){
+                    if(isValidMove(dx,dy,p,fromIdx,toIdx)){
                 possibleMoves.push({ pawn: p, from: cell, to: dest });
               }
             }
@@ -1791,6 +1912,294 @@ function aiTakeTurn(session){
     })();
   // AI has finished its decision (or passed). No special undo-block state is used now.
   }, thinkDelay);
+}
+
+// Hard AI: simple heuristic evaluator that prefers promotion and safe moves
+function aiTakeTurnHard(session){
+  if(typeof session !== 'number' || session !== _aiSession) return;
+  if(!aiEnabled) return;
+  // small randomized thinking delay, slightly longer for Hard
+  const thinkDelay = 360 + Math.floor(Math.random() * 260);
+  const localSession = session;
+  setTimeout(()=>{
+    if(localSession !== _aiSession) return;
+    try{
+      // If chain mode active, prioritize continuing chain with chainPawn
+      if(chainMode && chainPawn && chainPawn.dataset.color === aiColor){
+        const caps = availableCapturesFromCell(chainPawn.parentElement);
+        if(caps && caps.length > 0){
+          // pick the capture that yields most follow-ups (prefer deeper chains)
+          let best = null; let bestScore = -1;
+          for(const c of caps){
+            const f = availableCapturesFromCell(c.cell) || [];
+            const score = 100 + (f.length * 40);
+            if(score > bestScore){ bestScore = score; best = c.cell; }
+          }
+          if(best){ dragged = chainPawn; try{ handleDrop(new Event('ai-capture'), best); }catch(e){ console.warn('AI hard capture failed', e); } }
+          return;
+        }
+        // no immediate captures — allow final move if chainAllowLastMove
+        if(chainAllowLastMove){
+          // find safe non-capture moves for chainPawn (scan whole board so promoted pieces like knights/bishops
+          // can use their full move set as the final chain move)
+          const fromCell = chainPawn.parentElement; const fromIdx = Number(fromCell.dataset.index);
+          const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+          const candidates = [];
+          for(let toIdx = 0; toIdx < 25; toIdx++){
+            if(toIdx === fromIdx) continue;
+            const dest = board.children[toIdx]; if(!dest) continue; if(dest.querySelector('.pawn')) continue;
+            const nx = toIdx % 5, ny = Math.floor(toIdx / 5);
+            const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+            // respect the same diagonal-chain restriction used by handleDrop
+            if(isDiagonal(dx, dy)){
+              const adj1 = board.children[fy * 5 + nx];
+              const adj2 = board.children[ny * 5 + fx];
+              const adj1Empty = adj1 && !adj1.querySelector('.pawn');
+              const adj2Empty = adj2 && !adj2.querySelector('.pawn');
+              if(toIdx !== chainPrevIdx && !(adj1Empty || adj2Empty)) continue;
+            }
+            if(!(isValidMove(dx,dy,chainPawn,fromIdx,toIdx) || canDoubleStep(chainPawn, fromIdx, toIdx))) continue;
+            const wouldBeCaptured = _wouldBeCapturedByOpponentAt(toIdx, aiColor);
+            let score = (wouldBeCaptured ? -80 : 30) + (isPromotionIdx(chainPawn, toIdx) ? 180 : 0);
+            // small bonus to prefer forward progress when equal safety
+            score += _forwardProgressScore(chainPawn, fromIdx, toIdx);
+            candidates.push({cell: dest, score});
+          }
+          if(candidates.length>0){
+            candidates.sort((a,b)=>b.score - a.score);
+            // pick top score, break ties randomly
+            const topScore = candidates[0].score;
+            const topGroup = candidates.filter(c=> c.score === topScore);
+            const pick = topGroup[Math.floor(Math.random() * topGroup.length)];
+            dragged = chainPawn;
+            try{ handleDrop(new Event('ai-move'), pick.cell); }catch(e){}
+          }
+          return;
+        }
+      }
+
+      // Build board snapshot state for evaluation
+      const state = _buildState();
+
+      // Gather all candidate moves (captures and safe moves + spawn)
+      const allCandidates = [];
+      // 1) captures for each pawn
+      for(let i=0;i<25;i++){
+        const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(!p || p.dataset.color !== aiColor) continue;
+        const fromIdx = i;
+        // capture targets
+        const caps = availableCapturesFromCell(cell) || [];
+        for(const c of caps){
+          const toIdx = Number(c.idx || c.cell.dataset.index);
+          let score = 150;
+          // prefer captures that promote or open chains
+          if(isPromotionIdx(p, toIdx)) score += 220;
+          // deeper chain potential
+          const further = _countFurtherCapturesAfterMove(fromIdx, toIdx, state, aiColor);
+          score += further * 40;
+          // avoid capture if resulting square is immediately recapturable
+            const wouldBeCaptured = _wouldBeCapturedByOpponentAt(toIdx, aiColor, {fromIdx, toIdx});
+            if(wouldBeCaptured) score -= 120;
+            // extra penalty if the captured piece would be a promoted knight/bishop and
+            // an opponent PAWN could immediately recapture — Hard AI should avoid that.
+            const promotedType = p.dataset.piece || 'pawn';
+            const capturedByPawn = _wouldBeCapturedByOpponentPawnAt(toIdx, aiColor, {fromIdx, toIdx});
+            if((promotedType === 'knight' || promotedType === 'bishop') && capturedByPawn){
+              score -= 320; // large penalty to avoid walking into a pawn recapture
+            }
+          allCandidates.push({pawn: p, fromIdx, toIdx, cell: c.cell, score, type: 'capture'});
+        }
+        // non-capture moves around (including double-step)
+        const fx = fromIdx % 5, fy = Math.floor(fromIdx/5);
+        for(let nx = fx-1; nx <= fx+1; nx++){
+          for(let ny = fy-1; ny <= fy+1; ny++){
+            if(nx<0||nx>=5||ny<0||ny>=5) continue; const toIdx = ny*5 + nx; if(toIdx===fromIdx) continue;
+            const dest = board.children[toIdx]; if(!dest) continue; if(dest.querySelector('.pawn')) continue;
+            const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+            if(!(isValidMove(dx,dy,p,fromIdx,toIdx) || canDoubleStep(p, fromIdx, toIdx))) continue;
+            let score = 10; // baseline
+            if(isPromotionIdx(p, toIdx)) score += 200;
+            // favor advancing towards promotion row
+            score += _forwardProgressScore(p, fromIdx, toIdx);
+            // penalize moves that put piece in danger
+            const wouldBeCaptured = _wouldBeCapturedByOpponentAt(toIdx, aiColor, {fromIdx, toIdx});
+            if(wouldBeCaptured) score -= 90;
+            // Extra caution: if our moving piece is a promoted knight/bishop and an opponent pawn
+            // could capture the destination, avoid it strongly (Hard AI preference).
+            const movedType = p.dataset.piece || 'pawn';
+            const destCapturedByPawn = _wouldBeCapturedByOpponentPawnAt(toIdx, aiColor, {fromIdx, toIdx});
+            if((movedType === 'knight' || movedType === 'bishop') && destCapturedByPawn){
+              score -= 300;
+            }
+            allCandidates.push({pawn: p, fromIdx, toIdx, cell: dest, score, type: 'move'});
+          }
+        }
+      }
+
+      // 2) spawn candidates (if AI can spawn)
+      const homeRow = aiColor === 'red' ? 4 : 0;
+      if(countPawns(aiColor) < MAX_PAWNS_PER_PLAYER){
+        for(let c=0;c<5;c++){
+          const idx = homeRow*5 + c; const cell = board.children[idx]; if(cell && !cell.querySelector('.pawn')){
+            // spawn score: slightly less than a safe move, but consider promotion if start row is opponent row (unlikely)
+            let s = 18;
+            allCandidates.push({pawn: null, fromIdx: null, toIdx: idx, cell: cell, score: s, type: 'spawn'});
+          }
+        }
+      }
+
+      if(allCandidates.length === 0){ return; }
+      // choose best candidate (highest score) — break ties randomly
+      allCandidates.sort((a,b)=> b.score - a.score);
+      const topScore = allCandidates[0].score;
+      const topGroup = allCandidates.filter(c=> c.score === topScore);
+      const choice = topGroup[Math.floor(Math.random() * topGroup.length)];
+      if(!choice) return;
+      if(choice.type === 'spawn'){
+        try{ onCellClick(choice.cell); }catch(e){ console.warn('AI hard spawn failed', e); }
+        return;
+      }
+      // perform move/capture by setting dragged and calling handleDrop
+      try{ dragged = choice.pawn; handleDrop(new Event('ai-move'), choice.cell); }catch(e){ console.warn('AI hard move failed', e); }
+    }catch(e){ console.warn('AI hard unexpected error', e); }
+  }, thinkDelay);
+}
+
+// --- Helper functions used by Hard AI ---
+function _buildState(){
+  const s = new Array(25).fill(null);
+  for(let i=0;i<25;i++){ const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(p) s[i] = { color: p.dataset.color, piece: p.dataset.piece || 'pawn' }; }
+  return s;
+}
+
+function isPromotionIdx(pawnEl, toIdx){ if(!pawnEl) return false; const color = pawnEl.dataset.color; const row = Math.floor(toIdx/5); return (color === 'red' && row === 0) || (color === 'blue' && row === 4); }
+
+function _forwardProgressScore(pawnEl, fromIdx, toIdx){ try{ const color = pawnEl.dataset.color; const fromY = Math.floor(fromIdx/5); const toY = Math.floor(toIdx/5); const dir = (color === 'red') ? -1 : 1; const progress = (toY - fromY) * dir; return Math.max(0, progress) * 12; }catch(e){ return 0; } }
+
+// Count simple further capture opportunities after performing a capture (approximate)
+function _countFurtherCapturesAfterMove(fromIdx, toIdx, state, color){
+  // naive: temporarily simulate move on a shallow copy of state and count captures from toIdx
+  const s = state.slice(); s[toIdx] = s[fromIdx]; s[fromIdx] = null;
+  let count = 0;
+  // look for captures available from toIdx using state-based check
+  const fx = toIdx % 5, fy = Math.floor(toIdx/5);
+  const pawn = s[toIdx]; if(!pawn) return 0;
+  if(pawn.piece === 'pawn'){
+    const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+    for(const [dx,dy] of dirs){ const nx = fx+dx, ny = fy+dy; if(nx<0||nx>=5||ny<0||ny>=5) continue; const ni = ny*5 + nx; if(s[ni] && s[ni].color !== pawn.color) count++; }
+  } else if(pawn.piece === 'knight'){
+    const cand = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+    for(const [dx,dy] of cand){ const nx = fx+dx, ny = fy+dy; if(nx<0||nx>=5||ny<0||ny>=5) continue; const ni = ny*5 + nx; if(s[ni] && s[ni].color !== pawn.color) count++; }
+  } else if(pawn.piece === 'bishop'){
+    const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(const [sx,sy] of dirs){ let nx = fx+sx, ny = fy+sy; while(nx>=0&&nx<5&&ny>=0&&ny<5){ const ni = ny*5 + nx; if(s[ni]){ if(s[ni].color !== pawn.color) count++; break; } nx+=sx; ny+=sy; } }
+  }
+  return count;
+}
+
+// Return true if moving/being at 'idx' would allow opponent to capture that square
+function _wouldBeCapturedByOpponentAt(idx, ourColor, simulate){
+  try{
+    const state = _buildState();
+    // if simulate provided with fromIdx/toIdx, apply the move
+    if(simulate && typeof simulate.fromIdx === 'number'){
+      state[simulate.toIdx] = state[simulate.fromIdx]; state[simulate.fromIdx] = null;
+    }
+    const fx = idx % 5, fy = Math.floor(idx/5);
+    const oppColor = ourColor === 'red' ? 'blue' : 'red';
+    for(let i=0;i<25;i++){
+      const p = state[i]; if(!p || p.color !== oppColor) continue;
+      const sx = i % 5, sy = Math.floor(i/5);
+      const dx = Math.abs(sx - fx), dy = Math.abs(sy - fy);
+      if(p.piece === 'pawn'){
+        if(dx === 1 && dy === 1) return true;
+      } else if(p.piece === 'knight'){
+        if((dx===1 && dy===2) || (dx===2 && dy===1)) return true;
+      } else if(p.piece === 'bishop'){
+        if(dx === dy && dx !== 0){
+          // ensure path clear between i and idx according to state
+          const tx = fx, ty = fy; const fx2 = sx, fy2 = sy; const stepX = (tx>fx2)?1:-1; const stepY = (ty>fy2)?1:-1; let cx = fx2 + stepX, cy = fy2 + stepY; let blocked=false;
+          while(cx !== tx && cy !== ty){ const ci = cy*5 + cx; if(state[ci]){ blocked = true; break; } cx += stepX; cy += stepY; }
+          if(!blocked) return true;
+        }
+      }
+    }
+    return false;
+  }catch(e){ return false; }
+}
+
+// Return true if an opponent PAWN could capture the square at 'idx'
+function _wouldBeCapturedByOpponentPawnAt(idx, ourColor, simulate){
+  try{
+    const state = _buildState();
+    if(simulate && typeof simulate.fromIdx === 'number'){
+      state[simulate.toIdx] = state[simulate.fromIdx]; state[simulate.fromIdx] = null;
+    }
+    const fx = idx % 5, fy = Math.floor(idx/5);
+    const oppColor = ourColor === 'red' ? 'blue' : 'red';
+    for(let i=0;i<25;i++){
+      const p = state[i]; if(!p || p.color !== oppColor) continue;
+      if(p.piece !== 'pawn') continue; // only pawns
+      const sx = i % 5, sy = Math.floor(i/5);
+      const dx = Math.abs(sx - fx), dy = Math.abs(sy - fy);
+      if(dx === 1 && dy === 1) return true;
+    }
+    return false;
+  }catch(e){ return false; }
+}
+
+// Decide AI promotion choice: 'knight' or 'bishop'
+function aiChoosePromotion(pawn){
+  try{
+    if(!pawn) return 'knight';
+    // Easy mode: keep previous behavior for familiarity
+    if(aiDifficulty !== 'hard') return 'knight';
+    // Hard mode: evaluate both choices and pick the higher-scoring one
+    const cell = pawn.parentElement;
+    const state = _buildState();
+    const choices = ['knight','bishop'];
+    let best = 'knight'; let bestScore = -1e9;
+    // store whether each choice enables immediate capture opportunities
+    const wantChainFor = {};
+    for(const ch of choices){
+      // simulate setting piece type
+      const orig = pawn.dataset.piece;
+      pawn.dataset.piece = ch;
+      // count immediate capture opportunities after promotion
+      const caps = availableCapturesFromCell(cell) || [];
+      const capCount = caps.length;
+      // count mobility (valid moves)
+      let moveCount = 0;
+      const fromIdx = Number(cell.dataset.index);
+      const fx = fromIdx % 5, fy = Math.floor(fromIdx/5);
+      for(let nx = fx-2; nx <= fx+2; nx++){
+        for(let ny = fy-2; ny <= fy+2; ny++){
+          if(nx<0||nx>=5||ny<0||ny>=5) continue; const toIdx = ny*5 + nx; if(toIdx===fromIdx) continue;
+          const dx = Math.abs(nx - fx), dy = Math.abs(ny - fy);
+          const dest = board.children[toIdx]; if(!dest) continue;
+          // allow moves to empty tiles or captures
+          if(dest.querySelector('.pawn')){
+            if(isValidCapture(dx,dy,pawn,fromIdx,toIdx)) moveCount++;
+          } else {
+            if(isValidMove(dx,dy,pawn,fromIdx,toIdx) || canDoubleStep(pawn, fromIdx, toIdx)) moveCount++;
+          }
+        }
+      }
+      // promotion score: if promoted piece has immediate capture potential and mobility
+      let score = capCount * 200 + moveCount * 8;
+      // if promotion itself was to reach last row, small bonus for forcing tempo
+      if(isPromotionIdx(pawn, fromIdx)) score += 30;
+      // reverse dataset to avoid side-effects (we will call promotePawn after deciding)
+      pawn.dataset.piece = orig || 'pawn';
+      // consider wanting to chain if immediate captures exist or captures-with-followups
+      const furtherPotential = capCount + _countFurtherCapturesAfterMove(fromIdx, fromIdx, state, pawn.dataset.color);
+      wantChainFor[ch] = (capCount > 0 || furtherPotential > 0);
+      if(score > bestScore){ bestScore = score; best = ch; }
+    }
+    // mark pawn so after promotion we can decide to continue capturing
+    try{ pawn.dataset.aiWantsChain = wantChainFor[best] ? 'true' : 'false'; }catch(e){}
+    return best;
+  }catch(e){ return 'knight'; }
 }
 
 function playPlacementSound(){ try{ ensureAudioContext(); const now = audioCtx.currentTime; const gain = audioCtx.createGain(); gain.gain.value = 0.08; gain.connect(audioCtx.destination); const osc = audioCtx.createOscillator(); osc.type = 'sine'; osc.frequency.setValueAtTime(660, now); osc.frequency.exponentialRampToValueAtTime(880, now + 0.09); const env = audioCtx.createGain(); env.gain.setValueAtTime(0.0001, now); env.gain.linearRampToValueAtTime(1.0, now + 0.008); env.gain.exponentialRampToValueAtTime(0.0001, now + 0.16); osc.connect(env); env.connect(gain); osc.start(now); osc.stop(now + 0.18); }catch(e){} }
@@ -2142,8 +2551,8 @@ function takeSnapshot(){
     const isCapturedBlue = cell.classList.contains('captured-blue');
     const captured = isCapturedRed || isCapturedBlue;
     if(pawnEl){
-      // There is a pawn DOM in this cell — record its color and moved flag.
-      boardArr[i] = { pawn: pawnEl.dataset.color, moved: pawnEl.dataset.moved === 'true', captured: captured, capturedBy: captured ? (isCapturedRed ? 'red' : 'blue') : null };
+      // There is a pawn DOM in this cell — record its color, piece type and moved flag.
+      boardArr[i] = { pawn: pawnEl.dataset.color, piece: pawnEl.dataset.piece || 'pawn', moved: pawnEl.dataset.moved === 'true', captured: captured, capturedBy: captured ? (isCapturedRed ? 'red' : 'blue') : null };
     } else if(captured){
       // Tile is captured but no pawn DOM is present (a previously captured tile).
       boardArr[i] = { pawn: null, moved: false, captured: true, capturedBy: isCapturedRed ? 'red' : 'blue' };
@@ -2248,8 +2657,15 @@ function applySnapshot(snapshot){
     for(let i=0;i<25;i++){
       const cell = board.children[i];
       if(!cell) continue;
+      // Remove existing pawn DOM
       const existingPawn = cell.querySelector('.pawn');
       if(existingPawn) existingPawn.remove();
+      // Also remove any leftover promo glyphs so remote snapshot rebuilds don't
+      // leave stale badges behind when pawns move between clients.
+      try{
+        const staleGlyphs = cell.querySelectorAll('.promoGlyph');
+        if(staleGlyphs && staleGlyphs.length){ staleGlyphs.forEach(g=>{ try{ g.remove(); }catch(e){} }); }
+      }catch(e){}
       cell.classList.remove('captured-red','captured-blue','white','black');
       cell.classList.add((Math.floor(i/5) + i%5) % 2 === 0 ? 'white' : 'black');
     }
@@ -2276,6 +2692,25 @@ function applySnapshot(snapshot){
         pawn.dataset.moved = entry.moved ? 'true' : 'false';
         cell.appendChild(pawn);
         pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+        // Restore promotion state if snapshot recorded it (recreate visuals)
+        try{
+          // Ensure explicit data-* attributes are present (defensive for remote DOM reconstruction)
+          try{ pawn.setAttribute('data-color', entry.pawn); }catch(e){}
+          if(entry.piece && entry.piece !== 'pawn'){
+            // set dataset and recreate promo visuals (promoGlyph/promoRing)
+            try{ pawn.setAttribute('data-piece', entry.piece); pawn.dataset.piece = entry.piece; }catch(e){}
+            try{ promotePawn(pawn, entry.piece); }catch(e){ /* non-fatal */ }
+            // Ensure promoted class is applied exactly as play-time would
+            try{ pawn.classList.remove('promoted-bishop','promoted-knight'); pawn.classList.add(entry.piece === 'bishop' ? 'promoted-bishop' : 'promoted-knight'); }catch(e){}
+            // Ensure promoGlyph color class mirrors team (defensive)
+            try{
+              const cellPg = cell.querySelector('.promoGlyph');
+              if(cellPg){ cellPg.classList.remove('team-red','team-blue'); cellPg.classList.add(entry.pawn === 'red' ? 'team-red' : 'team-blue'); }
+            }catch(e){}
+          } else {
+            try{ pawn.setAttribute('data-piece', 'pawn'); pawn.dataset.piece = 'pawn'; }catch(e){}
+          }
+        }catch(e){ /* ignore promotion restore errors */ }
         // If this pawn occupies a captured tile, restore the captured class
         if(entry.captured && entry.capturedBy){
           if(entry.capturedBy === 'red') cell.classList.add('captured-red');
@@ -3037,7 +3472,60 @@ function showCoinFlip(){
 function countPawns(color){ let count = 0; for(let i=0;i<board.children.length;i++){ const cell = board.children[i]; if(!cell) continue; const p = cell.querySelector('.pawn'); if(p && p.dataset.color === color) count++; } return count; }
 
 function isValidMove(dx,dy){ return dx <= 1 && dy <= 1 && (dx + dy > 0); }
-function isValidCapture(dx,dy){ return dx === 1 && dy === 1; }
+// Enhanced isValidMove supporting promoted piece types when pawn element and
+// indices are provided. Backwards-compatible: callers that pass only dx,dy
+// will use the original pawn movement rules.
+function isValidMove(dx, dy, pawn, fromIdx, toIdx){
+  try{
+    if(!pawn) return (dx <= 1 && dy <= 1 && (dx + dy > 0));
+    const type = pawn.dataset.piece || 'pawn';
+    if(type === 'pawn') return (dx <= 1 && dy <= 1 && (dx + dy > 0));
+    if(type === 'knight') return (dx === 1 && dy === 2) || (dx === 2 && dy === 1);
+    if(type === 'bishop'){
+      if(dx !== dy || dx === 0) return false;
+      // Ensure path between fromIdx and toIdx is clear (no jumping)
+      if(typeof fromIdx === 'number' && typeof toIdx === 'number'){
+        const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+        const tx = toIdx % 5, ty = Math.floor(toIdx / 5);
+        const sx = (tx > fx) ? 1 : -1; const sy = (ty > fy) ? 1 : -1;
+        let cx = fx + sx, cy = fy + sy;
+        while(cx !== tx && cy !== ty){
+          const ci = cy * 5 + cx; const cell = board.children[ci]; if(cell && cell.querySelector('.pawn')) return false;
+          cx += sx; cy += sy;
+        }
+      }
+      return true;
+    }
+  }catch(e){ console.warn('isValidMove err', e); }
+  return false;
+}
+
+// Enhanced isValidCapture: supports pawn (diagonal step), bishop (diagonal any distance), knight (L-shape)
+function isValidCapture(dx, dy, pawn, fromIdx, toIdx){
+  try{
+    if(!pawn) return (dx === 1 && dy === 1);
+    const type = pawn.dataset.piece || 'pawn';
+    if(type === 'pawn') return (dx === 1 && dy === 1);
+    if(type === 'knight') return (dx === 1 && dy === 2) || (dx === 2 && dy === 1);
+    if(type === 'bishop'){
+      if(dx !== dy || dx === 0) return false;
+      // path must be clear except possibly the destination (which will be captured)
+      if(typeof fromIdx === 'number' && typeof toIdx === 'number'){
+        const fx = fromIdx % 5, fy = Math.floor(fromIdx / 5);
+        const tx = toIdx % 5, ty = Math.floor(toIdx / 5);
+        const sx = (tx > fx) ? 1 : -1; const sy = (ty > fy) ? 1 : -1;
+        let cx = fx + sx, cy = fy + sy;
+        while(cx !== tx && cy !== ty){
+          const ci = cy * 5 + cx; const cell = board.children[ci]; if(cell && cell.querySelector('.pawn')) return false;
+          cx += sx; cy += sy;
+        }
+      }
+      return true;
+    }
+  }catch(e){ console.warn('isValidCapture err', e); }
+  return false;
+}
+
 
 // New helper: canDoubleStep for first move (non-capturing, straight)
 function canDoubleStep(pawn, fromIdx, toIdx){
@@ -3064,21 +3552,143 @@ function canDoubleStep(pawn, fromIdx, toIdx){
   return true;
 }
 
-function availableDiagonalCapturesFromCell(cellElem){
+// Generalized capture finder that supports pawn (1-diagonal), bishop (any-distance diagonal), and knight (L-shape)
+// Renamed to availableCapturesFromCell to reflect support for non-diagonal captures (knight)
+function availableCapturesFromCell(cellElem){
   if(!cellElem) return [];
   const idx = Number(cellElem.dataset.index); const x = idx % 5; const y = Math.floor(idx/5);
-  const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
   const out = [];
   const pawn = cellElem.querySelector('.pawn'); if(!pawn) return [];
-  for(const [dx,dy] of dirs){
-    const nx = x + dx, ny = y + dy;
-    if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
-    const nIdx = ny*5 + nx; const neighbor = board.children[nIdx];
-    const occ = neighbor.querySelector('.pawn');
-    if(occ && occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+  const type = pawn.dataset.piece || 'pawn';
+  if(type === 'pawn'){
+    const dirs = [[-1,-1],[1,-1],[-1,1],[1,1]];
+    for(const [dx,dy] of dirs){
+      const nx = x + dx, ny = y + dy;
+      if(nx < 0 || nx >=5 || ny < 0 || ny >=5) continue;
+      const nIdx = ny*5 + nx; const neighbor = board.children[nIdx];
+      const occ = neighbor.querySelector('.pawn');
+      if(occ && occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+    }
+    return out;
+  }
+  if(type === 'knight'){
+    const cand = [[1,2],[2,1],[-1,2],[-2,1],[1,-2],[2,-1],[-1,-2],[-2,-1]];
+    for(const [dx,dy] of cand){
+      const nx = x + dx, ny = y + dy; if(nx<0||nx>=5||ny<0||ny>=5) continue;
+      const nIdx = ny*5 + nx; const neighbor = board.children[nIdx]; if(!neighbor) continue;
+      const occ = neighbor.querySelector('.pawn'); if(occ && occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+    }
+    return out;
+  }
+  if(type === 'bishop'){
+    const dirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(const [sx,sy] of dirs){
+      let nx = x + sx, ny = y + sy;
+      while(nx >=0 && nx < 5 && ny >=0 && ny < 5){
+        const nIdx = ny*5 + nx; const neighbor = board.children[nIdx];
+        const occ = neighbor.querySelector('.pawn');
+        if(occ){
+          if(occ.dataset.color !== pawn.dataset.color) out.push({ idx: nIdx, cell: neighbor });
+          break; // blocked beyond this point
+        }
+        nx += sx; ny += sy;
+      }
+    }
+    return out;
   }
   return out;
 }
+
+// Promotion helpers
+function promotePawn(pawn, choice){
+  try{
+    if(!pawn) return;
+    choice = (choice === 'knight') ? 'knight' : 'bishop';
+    pawn.dataset.piece = choice;
+    // Update visual: keep the team emoji, but overlay a centered small letter (B/K)
+    const face = pawn.querySelector('.pface');
+    const glyphChar = choice === 'bishop' ? 'B' : 'K';
+    try{
+      // ensure base emoji remains
+      if(face){
+        const baseEmoji = pawn.dataset.color === 'red' ? (window.selectedEmoji && window.selectedEmoji.red ? window.selectedEmoji.red : '🐲') : (window.selectedEmoji && window.selectedEmoji.blue ? window.selectedEmoji.blue : '🦄');
+        face.textContent = baseEmoji;
+      }
+  // create or update promoGlyph element attached to the parent cell so
+  // the badge aligns to the tile corner (top-right of the cell)
+  const cell = pawn.parentElement;
+  let pg = cell ? cell.querySelector('.promoGlyph') : null;
+  if(!pg){ pg = document.createElement('span'); pg.className = 'promoGlyph'; cell && cell.appendChild(pg); }
+  else if(pg.parentElement !== cell){ cell && cell.appendChild(pg); }
+  // show a larger crown to the left of the letter (crown first)
+  pg.innerHTML = '<span class="promoCrown">👑</span><span class="promoLetter">' + glyphChar + '</span>';
+      // Placement/styling for .promoGlyph is handled by the consolidated
+      // stylesheet rule appended at the end of the <style> block.
+      pawn.classList.remove('promoted-bishop','promoted-knight');
+      pawn.classList.add(choice === 'bishop' ? 'promoted-bishop' : 'promoted-knight');
+      // create or update the pulsing promo ring (neon) behind the glyph
+      try{
+        let pr = pawn.querySelector('.promoRing');
+        if(!pr){ pr = document.createElement('span'); pr.className = 'promoRing';
+          // append ring inside the pawn element (ring visually relates to pawn)
+          pawn.appendChild(pr);
+        }
+        // normalize classes for color variants
+        pr.classList.remove('red','blue');
+        pr.classList.add(pawn.dataset.color === 'red' ? 'red' : 'blue');
+      }catch(e){ console.warn('promotePawn ring err', e); }
+      // Ensure promoGlyph color/backdrop reflects team color by toggling a data attribute
+      try{
+        pg.classList.remove('team-red','team-blue');
+        pg.classList.add(pawn.dataset.color === 'red' ? 'team-red' : 'team-blue');
+      }catch(e){ /* non-fatal */ }
+    }catch(e){ console.warn('promotePawn visual update err', e); }
+  }catch(e){ console.warn('promotePawn err', e); }
+}
+
+// Create a promotion overlay that matches other modal overlays (backdrop + .modal-box)
+function ensurePromotionOverlay(){
+  try{
+    if(document.getElementById('promotionOverlay')) return document.getElementById('promotionOverlay');
+    const ov = document.createElement('div'); ov.id = 'promotionOverlay'; ov.setAttribute('aria-hidden','true'); ov.style.display = 'none';
+    ov.innerHTML = `
+      <div class="modal-backdrop"></div>
+      <div class="modal-box" role="dialog" aria-modal="true">
+        <button class="modal-close" id="promotionClose">×</button>
+        <h3 id="promotionTitle">Promote pawn</h3>
+        <div class="modal-content" id="promotionContent" style="display:flex;gap:12px;justify-content:center;margin-top:8px"></div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    // minimal CSS to align with other overlays (the .modal-box rules are shared in file)
+    ov.querySelector('#promotionClose').addEventListener('click', ()=>{ try{ hidePromotionOverlay(); }catch(e){} });
+    return ov;
+  }catch(e){ console.warn('ensurePromotionOverlay err', e); }
+}
+
+function showPromotionModal(pawn, cb){
+  try{
+    const ov = ensurePromotionOverlay(); if(!ov) return;
+    const content = ov.querySelector('#promotionContent'); if(!content) return;
+    content.innerHTML = '';
+    const bB = document.createElement('button'); bB.textContent = 'Bishop ♗'; bB.className = 'promo-choice';
+    const bN = document.createElement('button'); bN.textContent = 'Knight ♘'; bN.className = 'promo-choice';
+    content.appendChild(bB); content.appendChild(bN);
+    // show overlay
+    ov.style.display = 'flex'; ov.setAttribute('aria-hidden','false'); ov.classList.add('show');
+    // disable board interactions while promotion choice is open
+    try{ board.style.pointerEvents = 'none'; }catch(e){}
+    const cleanup = (choice)=>{
+      try{ ov.classList.remove('show'); ov.setAttribute('aria-hidden','true'); ov.style.display = 'none'; }catch(e){}
+      try{ board.style.pointerEvents = ''; }catch(e){}
+      try{ if(typeof cb === 'function') cb(choice); }catch(e){}
+    };
+    bB.onclick = ()=>{ try{ promotePawn(pawn,'bishop'); cleanup('bishop'); }catch(e){ console.warn(e); } };
+    bN.onclick = ()=>{ try{ promotePawn(pawn,'knight'); cleanup('knight'); }catch(e){ console.warn(e); } };
+  }catch(e){ console.warn('showPromotionModal err', e); }
+}
+
+function hidePromotionOverlay(){ try{ const ov = document.getElementById('promotionOverlay'); if(!ov) return; ov.classList.remove('show'); ov.setAttribute('aria-hidden','true'); ov.style.display = 'none'; try{ board.style.pointerEvents = ''; }catch(e){} }catch(e){} }
 
 // handleDrop: updated to allow double-step on first move
 function handleDrop(e, targetCell){
@@ -3091,7 +3701,7 @@ function handleDrop(e, targetCell){
   const dx = Math.abs((toIdx % 5) - (fromIdx % 5));
   const dy = Math.abs(Math.floor(toIdx / 5) - Math.floor(fromIdx / 5));
   // allow normal king-step moves or first-move double-step
-  if(!(isValidMove(dx,dy) || canDoubleStep(pawn, fromIdx, toIdx))) return;
+  if(!(isValidMove(dx,dy,pawn,fromIdx,toIdx) || canDoubleStep(pawn, fromIdx, toIdx))) return;
 
   const existing = targetCell.querySelector('.pawn');
 
@@ -3116,55 +3726,20 @@ function handleDrop(e, targetCell){
   }
 
   // Capture branch (diagonal capture)
-  if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy)){
+  if(existing && existing.dataset.color !== pawn.dataset.color && isValidCapture(dx,dy,pawn,fromIdx,toIdx)){
     existing.classList.add('captured');
     showExplosionAtCell(targetCell, pawn.dataset.color === 'red' ? 'red' : 'blue');
     playCaptureMelody(Math.min(6, Math.max(1, chainCount + 1)));
     setTimeout(()=>{
-  // leave a trail behind at the origin cell when a pawn moves, oriented toward the destination
-  try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
+      // leave a trail behind at the origin cell when a pawn moves, oriented toward the destination
+      try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
       targetCell.innerHTML = '';
       targetCell.classList.remove('white','black','captured-red','captured-blue');
       targetCell.classList.add(pawn.dataset.color === 'red' ? 'captured-red' : 'captured-blue');
       targetCell.appendChild(pawn);
-      pawn.classList.remove('dragging');
-      pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
-      // mark moved
-      pawn.dataset.moved = 'true';
-      scores[currentPlayer]++; chainCount++;
-      showCaptureEffect(targetCell, pawn.dataset.color);
-      const further = availableDiagonalCapturesFromCell(targetCell);
-      if(further.length > 0){
-        chainMode = true;
-        chainPawn = pawn;
-        // remember where this pawn came from so it can step back if needed
-        chainPrevIdx = fromIdx;
-        dragged = pawn;
-        recordSnapshot({ countAsMove: true });
-        updateStatus();
-        // If AI made this capture and it's the AI's pawn, schedule the next capture
-        if(aiEnabled && pawn.dataset.color === aiColor){
-          // wait slightly longer than the capture animation timeout before continuing
-          setTimeout(()=> scheduleAiIfNeeded(260), 260);
-        }
-      } else {
-        // No immediate captures remain — allow the pawn one final non-capture decision.
-        // Keep chain mode active but mark that the pawn is allowed one last move.
-        chainMode = true;
-        chainPawn = pawn;
-        chainPrevIdx = fromIdx;
-        chainAllowLastMove = true;
-        dragged = pawn;
-        // record the state so undo/redo will restore the fact that a final
-        // choice is available (this does not count as an extra move)
-        recordSnapshot({ countAsMove: true });
-        updateStatus();
-        // AI should not auto-continue here; schedule only if AI is the current actor
-        if(aiEnabled && pawn.dataset.color === aiColor){
-          // let the AI decide — it may choose to use the final move
-          setTimeout(()=> scheduleAiIfNeeded(260), 260);
-        }
-      }
+
+      // process common post-append logic (handles promotion and chain logic)
+      afterPawnPlaced(pawn, fromIdx, targetCell, true);
     }, 220);
     return;
   }
@@ -3175,36 +3750,110 @@ function handleDrop(e, targetCell){
   // leave a trail at the origin cell when a pawn moves, oriented toward the destination
   try{ if(fromCell && fromCell !== targetCell) showTrailAtCell(fromCell, pawn.dataset.color, targetCell); }catch(e){}
   targetCell.appendChild(pawn);
-  pawn.classList.remove('dragging');
-  pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
-  // mark moved if it was a single-step or a double-step (double-step check handled above)
-  pawn.dataset.moved = 'true';
-  playPlacementSound();
-  showPlacementEffect(targetCell);
-  // If this move was the one-time final decision after a chain with no further captures,
-  // consume that allowance and end the chain before switching turns.
-  if(chainAllowLastMove && pawn === chainPawn){
-    chainAllowLastMove = false;
-    chainMode = false;
-    chainPawn = null;
-    chainCount = 0;
-    chainPrevIdx = null;
-    // after consuming final decision, check for a win then switch turn as usual
-    if(!checkWinCapturedThreeInRow(currentPlayer)) {
-      switchTurn();
-      recordSnapshot({ countAsMove: true });
-    } else {
-      recordSnapshot({ countAsMove: true });
-    }
-    return;
-  }
+  // process common post-append logic for non-capture
+  afterPawnPlaced(pawn, fromIdx, targetCell, false);
+}
 
-  if(!checkWinCapturedThreeInRow(currentPlayer)) {
-    switchTurn();
-    recordSnapshot({ countAsMove: true });
-  } else {
-    recordSnapshot({ countAsMove: true });
-  }
+// Helper: called after a pawn element has been appended to a target cell.
+// Handles marking moved, capture vs placement effects, promotion, and
+// chain/turn resolution. 'wasCapture' should be true when the move captured.
+function afterPawnPlaced(pawn, fromIdx, targetCell, wasCapture){
+  try{
+    pawn.classList.remove('dragging');
+    pawn.__enableIdleAfterAppend && pawn.__enableIdleAfterAppend();
+    pawn.dataset.moved = 'true';
+    // If this pawn has a promo badge in its previous cell, move it with the pawn
+    try{
+      if(typeof fromIdx === 'number' && fromIdx >= 0){
+        const fromCellElem = board.children[fromIdx];
+        if(fromCellElem && fromCellElem !== targetCell){
+          const pg = fromCellElem.querySelector('.promoGlyph');
+          if(pg) targetCell.appendChild(pg);
+        }
+      }
+    }catch(e){}
+    if(wasCapture){
+      scores[currentPlayer]++; chainCount++;
+      showCaptureEffect(targetCell, pawn.dataset.color);
+      // If this capture created a run of three captured tiles for the current
+      // player, immediately end the game and show the victory screen.
+      // checkWinCapturedThreeInRow calls endGame() internally when true.
+      try{
+        if(checkWinCapturedThreeInRow(currentPlayer)){
+          // Persist snapshot for multiplayer observers and return early.
+          recordSnapshot({ countAsMove: true });
+          return;
+        }
+      }catch(e){ console.warn('win check after capture failed', e); }
+    } else {
+      playPlacementSound();
+      showPlacementEffect(targetCell);
+    }
+
+    const toIdx = Number(targetCell.dataset.index);
+    const needsPromote = (pawn.dataset.piece === 'pawn') && ((pawn.dataset.color === 'red' && Math.floor(toIdx/5) === 0) || (pawn.dataset.color === 'blue' && Math.floor(toIdx/5) === 4));
+
+    const continueAfterPromotion = ()=>{
+      try{
+        if(wasCapture){
+          const further = availableCapturesFromCell(targetCell);
+          if(further.length > 0){
+            chainMode = true; chainPawn = pawn; chainPrevIdx = fromIdx; dragged = pawn; recordSnapshot({ countAsMove: true }); updateStatus();
+            if(aiEnabled && pawn.dataset.color === aiColor){ setTimeout(()=> scheduleAiIfNeeded(260), 260); }
+          } else {
+            chainMode = true; chainPawn = pawn; chainPrevIdx = fromIdx; chainAllowLastMove = true; dragged = pawn; recordSnapshot({ countAsMove: true }); updateStatus();
+            if(aiEnabled && pawn.dataset.color === aiColor){ setTimeout(()=> scheduleAiIfNeeded(260), 260); }
+          }
+        } else {
+          if(chainAllowLastMove && pawn === chainPawn){
+            chainAllowLastMove = false; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null;
+            if(!checkWinCapturedThreeInRow(currentPlayer)) { switchTurn(); recordSnapshot({ countAsMove: true }); } else { recordSnapshot({ countAsMove: true }); }
+            return;
+          }
+          if(!checkWinCapturedThreeInRow(currentPlayer)) { switchTurn(); recordSnapshot({ countAsMove: true }); } else { recordSnapshot({ countAsMove: true }); }
+        }
+      }catch(e){ console.warn('afterPawnPlaced continue err', e); }
+    };
+
+    if(needsPromote){
+      // Determine whether the local human should choose the promotion.
+      // In multiplayer the human controls the side if myPlayerColor matches pawn color.
+      // In single-player, the human should NOT be offered choice for the AI-controlled color (aiColor).
+      const humanControls = (multiplayerRoomId) ? (myPlayerColor && pawn.dataset.color === myPlayerColor) : (pawn.dataset.color !== aiColor);
+      if(humanControls){
+        // show choice UI to the human controlling this pawn
+        showPromotionModal(pawn, choice=>{ promotePawn(pawn, choice); continueAfterPromotion(); });
+      } else {
+        // AI: decide whether to promote to knight or bishop
+        try{
+          const choice = (typeof aiChoosePromotion === 'function') ? aiChoosePromotion(pawn) : 'knight';
+          promotePawn(pawn, choice);
+        }catch(e){
+          // fallback
+          promotePawn(pawn, 'knight');
+        }
+        // If the hard AI indicated it wants to continue capturing after promotion,
+        // and there are captures available from the promoted pawn, start chain mode
+        try{
+          if(pawn.dataset && pawn.dataset.aiWantsChain === 'true'){
+            const postCaps = availableCapturesFromCell(targetCell) || [];
+            if(postCaps.length > 0){
+              chainMode = true; chainPawn = pawn; chainPrevIdx = fromIdx; dragged = pawn; recordSnapshot({ countAsMove: true }); updateStatus();
+              if(aiEnabled && pawn.dataset.color === aiColor){ setTimeout(()=> scheduleAiIfNeeded(260), 260); }
+              // clear the AI flag now that it's consumed
+              try{ delete pawn.dataset.aiWantsChain; }catch(e){}
+              return;
+            }
+          }
+        }catch(e){ /* non-fatal */ }
+        // clear the AI flag if present
+        try{ delete pawn.dataset.aiWantsChain; }catch(e){}
+        continueAfterPromotion();
+      }
+    } else {
+      continueAfterPromotion();
+    }
+  }catch(e){ console.warn('afterPawnPlaced err', e); }
 }
 
 function switchTurn(){ currentPlayer = currentPlayer === 'red' ? 'blue' : 'red'; updateStatus(); dragged = null; chainMode = false; chainPawn = null; chainCount = 0; chainPrevIdx = null; chainAllowLastMove = false; scheduleAiIfNeeded(); }
@@ -3222,7 +3871,7 @@ function scheduleAiIfNeeded(delay = 420){
 function isAnyOverlayOpen(){
   try{
     // Check the main overlays by id if they exist
-      const ids = ['emojiPickerOverlay','rulesOverlay','victoryOverlay','creditsOverlay'];
+    const ids = ['emojiPickerOverlay','promotionOverlay','rulesOverlay','victoryOverlay','creditsOverlay'];
     for(const id of ids){
       const el = document.getElementById(id);
       if(!el) continue;
@@ -3463,6 +4112,8 @@ function makePawn(color){
   pawn.className = 'pawn';
   pawn.draggable = true;
   pawn.dataset.color = color;
+  // default piece type is 'pawn' (can be promoted to 'bishop' or 'knight')
+  pawn.dataset.piece = 'pawn';
   const face = document.createElement('span');
   face.className = 'pface';
   // Use selected emojis when available
@@ -3481,7 +4132,7 @@ function makePawn(color){
     pauseIdle();
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
-      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+  if(cpCell && availableCapturesFromCell(cpCell).length === 0){
         // Instead of immediately ending the chain, allow the chain pawn one
         // final non-capture decision. Mark that allowance and persist state.
         if(pawn === chainPawn){
@@ -3513,7 +4164,7 @@ function makePawn(color){
     pauseIdle();
     if(chainMode && chainPawn){
       const cpCell = chainPawn.parentElement;
-      if(cpCell && availableDiagonalCapturesFromCell(cpCell).length === 0){
+  if(cpCell && availableCapturesFromCell(cpCell).length === 0){
         if(pawn === chainPawn){
           chainAllowLastMove = true;
           recordSnapshot({ countAsMove: false });
@@ -3589,7 +4240,7 @@ function makePawn(color){
                   }
                 }
                 const dxCells = Math.abs(tx - fx), dyCells = Math.abs(ty - fy);
-                if(isValidMove(dxCells, dyCells) || canDoubleStep(pawn, fromIdx, toIdx)){
+                if(isValidMove(dxCells, dyCells, pawn, fromIdx, toIdx) || canDoubleStep(pawn, fromIdx, toIdx)){
                   try { handleDrop(new Event('swipe-drop'), targetCell); } catch(e){}
                 }
               }
@@ -3652,14 +4303,27 @@ if(aiToggleBtn){
   aiToggleBtn.classList.add('toggle-btn');
   function setAiBtnState(){
     aiToggleBtn.setAttribute('aria-pressed', aiEnabled ? 'true' : 'false');
-    aiToggleBtn.textContent = aiEnabled ? 'AI: On' : 'AI: Off';
+    // Display difficulty name when AI is enabled.
+    aiToggleBtn.textContent = aiEnabled ? ('AI: ' + (aiDifficulty === 'hard' ? 'Hard' : 'Easy')) : 'AI: Off';
     aiToggleBtn.classList.toggle('toggle-on', aiEnabled);
     aiToggleBtn.classList.toggle('toggle-off', !aiEnabled);
   }
   // initialize state
   setAiBtnState();
   aiToggleBtn.addEventListener('click', ()=>{
-    aiEnabled = !aiEnabled;
+    // Cycle states: Off -> Hard -> Easy -> Off
+    if(!aiEnabled){
+      // Turn AI on with default Hard
+      aiEnabled = true;
+      aiDifficulty = 'hard';
+    } else if(aiEnabled && aiDifficulty === 'hard'){
+      // Switch to Easy while staying enabled
+      aiDifficulty = 'easy';
+      aiEnabled = true;
+    } else {
+      // Currently enabled && easy -> turn off
+      aiEnabled = false;
+    }
     // if turning off, cancel any scheduled AI timer immediately
     if(!aiEnabled && _aiTimer){ clearTimeout(_aiTimer); _aiTimer = null; }
     setAiBtnState();
@@ -3667,6 +4331,7 @@ if(aiToggleBtn){
     if(aiEnabled) scheduleAiIfNeeded(320);
   });
 }
+// (Difficulty button removed — aiToggleBtn now cycles: Hard -> Easy -> Off)
 
 
 // Rules Overlay HTML
@@ -3681,11 +4346,12 @@ rulesOverlay.innerHTML = `
       <h1>Welcome to Tic-Tac-Attack! 👋</h1>
       <p>A game that combines pawns from chess with tic-tac-toe! Here are the rules. ♟️</p>
       <ol>
-        <li>) You are allowed one move per turn. ➡️</li>
-        <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
+        <li>) You are allowed one move per turn unless in a chain attack. ➡️</li>
+        <li>) Capturing a piece allows that piece to capture/move again. Causing a chain attack. ⚔️</li>
         <li>) Pawns may move one space in any direction but can only capture diagonally. 🎯</li>
-        <li>) Capturing a piece allows that piece to capture/move again if there is a target in sight. Causing a chain attack. ⚔️</li>
+        <li>) Pawns may move up two squares on their first move. (Just like in chess) ✌️</li>
         <li>) You can only have five pawns out at a time. (Click on your starting row to spawn a new pawn) 👁️</li>
+        <li>) Getting a pawn to the opponent's back row allows for promotion. (Transform your pawn into a Bishop or Knight) 👑</li>
         <li>) Capture three pawns in a row to win. (Just like in Tic-Tac-Toe) 🏆</li>
         <li>) If the game ends a draw the person with the most points wins. (Points are based upon enemy pawns captured) 🏀</li>
       </ol>
